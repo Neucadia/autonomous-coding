@@ -373,6 +373,38 @@ Read the existing file and update the feature count references:
 
 ---
 
+# AFTER FILE GENERATION: NEXT STEPS
+
+Once files are generated, tell the user what to do next:
+
+> "Your specification files have been created! Here's what to do next:
+>
+> **1. Run the autonomous coding agent:**
+> ```bash
+> python autonomous_agent_demo.py --project-dir ./[project_name]
+> ```
+>
+> **2. For a quick test run (recommended first time):**
+> ```bash
+> python autonomous_agent_demo.py --project-dir ./[project_name] --max-iterations 3
+> ```
+>
+> **Important timing expectations:**
+> - **First session:** The agent generates a feature_list.json with all your test cases. This takes several minutes and may appear to hang - this is normal.
+> - **Subsequent sessions:** Each coding iteration takes 5-15 minutes depending on complexity.
+> - **Full app:** Building all [X] features will take many hours across multiple sessions.
+>
+> **Controls:**
+> - Press `Ctrl+C` to pause at any time
+> - Run the same command again to resume where you left off
+>
+> **Check your generated app:**
+> After the agent runs, your project will be in `./[project_name]/` with the generated application code."
+
+Replace `[project_name]` with the actual project name they provided, and `[X]` with their feature count.
+
+---
+
 # IMPORTANT REMINDERS
 
 - **Meet users where they are**: Not everyone is technical. Ask about what they want, not how to build it.
