@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.expression import func
 
 from api.database import Feature, get_db
 
@@ -107,6 +108,7 @@ def create_app(project_dir: Path) -> FastAPI:
         offset: int = Query(0, ge=0),
         passes: Optional[bool] = Query(None),
         category: Optional[str] = Query(None),
+        random: bool = Query(False),
         db: Session = Depends(get_db),
     ):
         """
@@ -116,6 +118,7 @@ def create_app(project_dir: Path) -> FastAPI:
         - **offset**: Number of features to skip
         - **passes**: Filter by pass status (true/false)
         - **category**: Filter by category name
+        - **random**: If true, return random features (for regression testing)
 
         NOTE: This endpoint is primarily for regression testing (fetching a few passing features).
         Use /features/next to get the next feature to work on.
@@ -133,12 +136,16 @@ def create_app(project_dir: Path) -> FastAPI:
         total = query.count()
 
         # Apply ordering and pagination
-        features = (
-            query.order_by(Feature.priority.asc(), Feature.id.asc())
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        if random:
+            # Random order for regression testing
+            features = query.order_by(func.random()).limit(limit).all()
+        else:
+            features = (
+                query.order_by(Feature.priority.asc(), Feature.id.asc())
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
 
         return {
             "features": [f.to_dict() for f in features],

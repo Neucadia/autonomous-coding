@@ -57,7 +57,7 @@ Run 1-2 of the features marked as passing that are most core to the app's functi
 
 To get passing features for regression testing:
 ```bash
-curl -s "http://localhost:8765/features?passes=true&limit=3"
+curl -s "http://localhost:8765/features?passes=true&limit=3&random=true"
 ```
 For example, if this were a chat app, you should perform a test that logs into the app, sends a message, and gets a response.
 
@@ -289,8 +289,8 @@ curl -s http://localhost:8765/features/stats
 # 2. Get the NEXT feature to work on (one feature only)
 curl -s http://localhost:8765/features/next
 
-# 3. Get up to 3 passing features for regression testing
-curl -s "http://localhost:8765/features?passes=true&limit=3"
+# 3. Get up to 3 random passing features for regression testing
+curl -s "http://localhost:8765/features?passes=true&limit=3&random=true"
 
 # 4. Mark a feature as passing
 curl -X PATCH http://localhost:8765/features/{id} \

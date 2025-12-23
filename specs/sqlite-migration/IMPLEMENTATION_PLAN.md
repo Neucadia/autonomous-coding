@@ -55,7 +55,7 @@ FastAPI endpoints:
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `GET` | `/features` | List features with pagination/filtering |
+| `GET` | `/features` | List features (max 5, supports `random=true`) |
 | `GET` | `/features/next` | Get highest-priority pending feature |
 | `GET` | `/features/stats` | Get `{passing, total, percentage}` |
 | `GET` | `/features/{id}` | Get single feature |
@@ -64,6 +64,13 @@ FastAPI endpoints:
 | `PATCH` | `/features/{id}` | Update feature (only `passes` field) |
 | `DELETE` | `/features/{id}` | Delete feature (use with caution) |
 | `GET` | `/health` | Health check |
+
+**Query Parameters for `/features`:**
+- `limit` - Max 5 features (hard cap to prevent token waste)
+- `offset` - Pagination offset
+- `passes` - Filter by pass status (true/false)
+- `category` - Filter by category name
+- `random` - If true, return random features (for regression testing)
 
 ### 4. `api/server.py`
 Server lifecycle manager:
@@ -101,8 +108,8 @@ finally:
 
 ### 2. `progress.py`
 Replaced JSON file reads with API calls:
-- `count_passing_tests()` → `GET /features/stats`
-- `send_progress_webhook()` → `GET /features?passes=true` for newly passing
+- `count_passing_tests()` -> `GET /features/stats`
+- `send_progress_webhook()` -> `GET /features?passes=true` for newly passing
 
 ### 3. `agent.py`
 Updated first-run detection to check for either JSON file OR SQLite database:
@@ -116,30 +123,31 @@ db_file = project_dir / "features.db"
 is_first_run = not json_file.exists() and not db_file.exists()
 ```
 
-### 4. `security.py`
-Added `jq` to `ALLOWED_COMMANDS` for JSON parsing in agent prompts.
-
-### 5. `prompts/coding_prompt.md`
-Updated Step 1 (Get Bearings):
-```bash
-# Old
-cat feature_list.json | head -50
-cat feature_list.json | grep '"passes": false' | wc -l
-
-# New
-curl -s http://localhost:8765/features/stats | jq
-curl -s http://localhost:8765/features/next | jq
+### 4. `prompts.py`
+Added explicit UTF-8 encoding for cross-platform compatibility:
+```python
+return prompt_path.read_text(encoding="utf-8")
 ```
 
-Updated Step 7 (Update Status):
+### 5. `prompts/coding_prompt.md`
+Updated to use API endpoints (no jq dependency):
 ```bash
-# Old: Edit JSON file directly
+# Get progress stats
+curl -s http://localhost:8765/features/stats
 
-# New
+# Get next feature to work on
+curl -s http://localhost:8765/features/next
+
+# Get random passing features for regression testing
+curl -s "http://localhost:8765/features?passes=true&limit=3&random=true"
+
+# Mark feature as passing
 curl -X PATCH http://localhost:8765/features/42 \
   -H "Content-Type: application/json" \
   -d '{"passes": true}'
 ```
+
+Added **API USAGE RULES** section with explicit allowed/forbidden calls to prevent exploratory queries that waste tokens.
 
 ### 6. `prompts/initializer_prompt.md`
 Replaced file creation with API bulk upload:
@@ -181,6 +189,20 @@ sqlalchemy>=2.0.0
 }
 ```
 
+### GET /features?passes=true&limit=3&random=true
+```json
+{
+  "features": [
+    {"id": 12, "name": "...", ...},
+    {"id": 87, "name": "...", ...},
+    {"id": 45, "name": "...", ...}
+  ],
+  "total": 45,
+  "limit": 3,
+  "offset": 0
+}
+```
+
 ### POST /features/bulk
 Request:
 ```json
@@ -191,6 +213,20 @@ Request:
 }
 ```
 Response: `{"created": 340}`
+
+## Design Decisions
+
+### 1. No jq Dependency
+The API returns raw JSON which Claude can parse directly. This avoids requiring `jq` installation on Windows/Mac/Linux.
+
+### 2. Hard Limit Cap (5 features max)
+The `/features` endpoint caps `limit` at 5 to prevent agents from making exploratory queries that fetch 20-50 features and waste tokens.
+
+### 3. Random Parameter for Regression Testing
+Added `random=true` parameter to return random passing features instead of always the same ones (ordered by priority/ID).
+
+### 4. Strict API Usage Rules in Prompt
+Added explicit ALLOWED and FORBIDDEN API calls section to prevent agents from browsing the feature catalog.
 
 ## Migration Strategy
 
@@ -207,13 +243,14 @@ Response: `{"created": 340}`
 
 ## Testing Checklist
 
-- [ ] New project: Features created via API
-- [ ] Existing project: JSON auto-migrated to SQLite
-- [ ] Pagination works with large feature sets
-- [ ] PATCH /features/{id} only allows `passes` field update
-- [ ] Server starts/stops cleanly with agent lifecycle
-- [ ] Progress tracking (progress.py) works via API
-- [ ] Webhook notifications include newly passing features
+- [x] New project: Features created via API
+- [x] Existing project: JSON auto-migrated to SQLite
+- [x] Limit capped at 5 features max
+- [x] Random parameter returns different features each call
+- [x] PATCH /features/{id} only allows `passes` field update
+- [x] Server starts/stops cleanly with agent lifecycle
+- [x] Progress tracking (progress.py) works via API
+- [x] Cross-platform compatibility (Windows, Mac, Linux)
 
 ## Rollback Plan
 

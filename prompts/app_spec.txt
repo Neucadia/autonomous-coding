@@ -1,681 +1,1065 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project_specification>
-  <project_name>Claude.ai Clone - AI Chat Interface</project_name>
+  <project_name>Business Finder</project_name>
 
   <overview>
-    Build a fully functional clone of claude.ai, Anthropic's conversational AI interface. The application should
-    provide a clean, modern chat interface for interacting with Claude via the API, including features like
-    conversation management, artifact rendering, project organization, multiple model selection, and advanced
-    settings. The UI should closely match claude.ai's design using Tailwind CSS with a focus on excellent
-    user experience and responsive design.
+    Business Finder is a global business directory application where business owners can list their businesses with comprehensive information (contact details, operating hours, services, events) and users can discover businesses through powerful PostgreSQL full-text search, category browsing, or location-based discovery. The platform supports country-based filtering with automatic detection via IP/browser geolocation. Users can review businesses, save favorites, and RSVP to events. Business owners have a dedicated dashboard with full analytics (views, impressions, charts by source/location/device) and can respond to reviews. Platform administrators manage users, verify businesses, moderate content, and maintain categories. The app features a professional glassmorphism design with warm tones (oranges, ambers, warm grays).
   </overview>
 
   <technology_stack>
-    <api_key>
-        You can use an API key located at /tmp/api-key for testing. You will not be allowed to read this file, but you can reference it in code.
-    </api_key>
     <frontend>
-      <framework>React with Vite</framework>
-      <styling>Tailwind CSS (via CDN)</styling>
-      <state_management>React hooks and context</state_management>
-      <routing>React Router for navigation</routing>
-      <markdown>React Markdown for message rendering</markdown>
-      <code_highlighting>Syntax highlighting for code blocks</code_highlighting>
-      <port>Only launch on port {frontend_port}</port>
+      <framework>Next.js 16.0.7</framework>
+      <ui_library>React 19.2.1</ui_library>
+      <language>TypeScript 5.9.3</language>
+      <styling>TailwindCSS 4.1.17</styling>
+      <components>shadcn/ui with Radix UI primitives</components>
+      <icons>Lucide React</icons>
+      <charts>Recharts (for analytics dashboards)</charts>
+      <maps>Leaflet with React-Leaflet (open source maps)</maps>
+      <notifications>Sonner (toasts) + custom notification system</notifications>
+      <theming>next-themes (dark mode support)</theming>
     </frontend>
     <backend>
-      <runtime>Node.js with Express</runtime>
-      <database>SQLite with better-sqlite3</database>
-      <api_integration>Claude API for chat completions</api_integration>
-      <streaming>Server-Sent Events for streaming responses</streaming>
+      <runtime>Node.js with Next.js API routes</runtime>
+      <database>PostgreSQL with full-text search (tsvector)</database>
+      <orm>Drizzle ORM 0.44.7</orm>
+      <validation>Zod</validation>
     </backend>
-    <communication>
-      <api>RESTful endpoints</api>
-      <streaming>SSE for real-time message streaming</streaming>
-      <claude_api>Integration with Claude API using Anthropic SDK</claude_api>
-    </communication>
+    <authentication>
+      <provider>Better Auth 1.4.5</provider>
+      <method>Email and password (replacing Google OAuth from boilerplate)</method>
+      <features>Email verification, password reset, session management</features>
+    </authentication>
+    <utilities>
+      <css_utilities>class-variance-authority, clsx, tailwind-merge</css_utilities>
+    </utilities>
   </technology_stack>
 
-  <prerequisites>
-    <environment_setup>
-      - Repository includes .env with VITE_ANTHROPIC_API_KEY configured
-      - Frontend dependencies pre-installed via pnpm
-      - Backend code goes in /server directory
-      - Install backend dependencies as needed
-    </environment_setup>
-  </prerequisites>
+  <design_system>
+    <style>Professional glassmorphism</style>
+    <effects>Transparent components with backdrop blur, glass effects</effects>
+    <color_palette>
+      <primary>Warm tones - oranges, ambers</primary>
+      <neutral>Warm grays</neutral>
+      <accent>Derived warm accent colors</accent>
+    </color_palette>
+    <dark_mode>Full support with next-themes</dark_mode>
+    <responsive>Mobile-first, fully responsive design</responsive>
+  </design_system>
+
+  <feature_count>340</feature_count>
+
+  <security_and_access_control>
+    <user_roles>
+      <role name="user">
+        <description>Default role for all registered users</description>
+        <permissions>
+          - Browse and search businesses
+          - View business details
+          - Write reviews and ratings
+          - Save businesses to favorites
+          - RSVP to events
+          - Manage own profile and settings
+          - Add new business listings (anyone can add)
+          - Claim ownership of business listings
+          - Switch to business owner mode (if owns businesses)
+          - Report inappropriate reviews
+        </permissions>
+        <protected_routes>
+          - /dashboard/* (authenticated users)
+          - /profile/* (authenticated users)
+          - /favorites (authenticated users)
+          - /my-reviews (authenticated users)
+        </protected_routes>
+      </role>
+      <role name="business_owner">
+        <description>Users who have claimed or created business listings (mode within user role)</description>
+        <permissions>
+          - All user permissions
+          - Edit own business listings
+          - Delete own business listings
+          - View analytics for own businesses (impressions, views, charts)
+          - Respond to reviews on own businesses
+          - Create and manage events for own businesses
+          - View detailed statistics by source, location, device
+        </permissions>
+        <protected_routes>
+          - /business-dashboard/* (business owners)
+          - /my-listings/* (business owners)
+        </protected_routes>
+      </role>
+      <role name="admin">
+        <description>Platform administrators with full system access</description>
+        <permissions>
+          - All user and business owner permissions
+          - Access admin dashboard
+          - View and manage all users
+          - View and manage all business listings
+          - Verify/unverify businesses
+          - Remove businesses
+          - Flag businesses
+          - Moderate reported reviews
+          - Remove inappropriate reviews
+          - Manage categories and subcategories
+          - Approve/reject business ownership claims
+          - View platform-wide statistics
+        </permissions>
+        <protected_routes>
+          - /admin/* (platform admins only)
+        </protected_routes>
+      </role>
+    </user_roles>
+    <authentication>
+      <method>Email and password via Better Auth</method>
+      <features>
+        - Email verification on signup
+        - Password reset via email
+        - Session-based authentication
+        - Remember me functionality
+      </features>
+    </authentication>
+    <platform_role_implementation>
+      <description>Add platform_role column to users table</description>
+      <values>null (default/user), 'admin'</values>
+      <note>Business owner mode is determined by having claimed/owned businesses, not a separate role</note>
+    </platform_role_implementation>
+  </security_and_access_control>
 
   <core_features>
-    <chat_interface>
-      - Clean, centered chat layout with message bubbles
-      - Streaming message responses with typing indicator
-      - Markdown rendering with proper formatting
-      - Code blocks with syntax highlighting and copy button
-      - LaTeX/math equation rendering
-      - Image upload and display in messages
-      - Multi-turn conversations with context
-      - Message editing and regeneration
-      - Stop generation button during streaming
-      - Input field with auto-resize textarea
-      - Character count and token estimation
-      - Keyboard shortcuts (Enter to send, Shift+Enter for newline)
-    </chat_interface>
+    <boilerplate_cleanup priority="1">
+      - Remove AI SDK dependencies (ai, @ai-sdk/react, @openrouter/ai-sdk-provider)
+      - Remove OpenRouter configuration and environment variables
+      - Remove chat page (/chat) and API route (/api/chat)
+      - Remove AI-related components
+      - Remove Google OAuth provider from Better Auth config
+      - Implement email/password authentication
+      - Add email verification flow
+      - Add password reset flow
+      - Update all branding from 'Agentic Coding Boilerplate' to 'Business Finder'
+      - Remove unused components (setup-checklist, starter-prompt-modal, diagnostics)
+      - Clean up package.json and remove unused dependencies
+      - Update environment variable documentation
+    </boilerplate_cleanup>
 
-    <artifacts>
-      - Artifact detection and rendering in side panel
-      - Code artifact viewer with syntax highlighting
-      - HTML/SVG preview with live rendering
-      - React component preview
-      - Mermaid diagram rendering
-      - Text document artifacts
-      - Artifact editing and re-prompting
-      - Full-screen artifact view
-      - Download artifact content
-      - Artifact versioning and history
-    </artifacts>
+    <authentication priority="2">
+      - Email/password signup with validation
+      - Email verification with confirmation link
+      - Sign in with email/password
+      - Sign out with session cleanup
+      - Password reset request via email
+      - Password reset completion with token
+      - Session management and persistence
+      - Remember me functionality
+      - Protected route middleware
+      - Auth state context provider
+      - Profile page with user info
+      - Profile editing (name, avatar)
+      - Password change from settings
+      - Account deletion with confirmation
+    </authentication>
 
-    <conversation_management>
-      - Create new conversations
-      - Conversation list in sidebar
-      - Rename conversations
-      - Delete conversations
-      - Search conversations by title/content
-      - Pin important conversations
-      - Archive conversations
-      - Conversation folders/organization
-      - Duplicate conversation
-      - Export conversation (JSON, Markdown, PDF)
-      - Conversation timestamps (created, last updated)
-      - Unread message indicators
-    </conversation_management>
+    <glassmorphism_design priority="3">
+      - Glassmorphism design tokens in Tailwind config
+      - Glass card component with backdrop blur
+      - Glass button variants
+      - Glass input fields
+      - Glass navigation bar
+      - Glass sidebar component
+      - Glass modal/dialog
+      - Warm color palette implementation (oranges, ambers, warm grays)
+      - Dark mode glassmorphism variants
+      - Consistent border and shadow styles
+      - Smooth transitions and hover effects
+      - Loading skeleton with glass effect
+    </glassmorphism_design>
 
-    <projects>
-      - Create projects to group related conversations
-      - Project knowledge base (upload documents)
-      - Project-specific custom instructions
-      - Share projects with team (mock feature)
-      - Project settings and configuration
-      - Move conversations between projects
-      - Project templates
-      - Project analytics (usage stats)
-    </projects>
+    <categories priority="4">
+      - Categories table with name, slug, icon, order
+      - Subcategories table with parent relationship
+      - Seed database with common business categories
+      - Category grid/list display on browse page
+      - Subcategory navigation
+      - Category selection in business forms (multi-select)
+      - Admin: Add new category
+      - Admin: Edit category (name, icon, order)
+      - Admin: Delete category (with validation)
+      - Admin: Add/edit/delete subcategories
+      - Admin: Reorder categories via drag-drop or arrows
+    </categories>
 
-    <model_selection>
-      - Model selector dropdown with the following models:
-        - Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - default
-        - Claude Haiku 4.5 (claude-haiku-4-5-20251001)
-        - Claude Opus 4.1 (claude-opus-4-1-20250805)
-      - Model capabilities display
-      - Context window indicator
-      - Model-specific pricing info (display only)
-      - Switch models mid-conversation
-      - Model comparison view
-    </model_selection>
+    <business_listings priority="5">
+      - Business table with all fields
+      - Create business listing form (multi-step or single page)
+      - Business name and description (rich text)
+      - Contact information (phone, email, website)
+      - Address input with country selection
+      - Coordinates storage (latitude, longitude)
+      - Operating hours per day of week
+      - Special hours (holidays, exceptions)
+      - Products/services list
+      - Photo upload (multiple images)
+      - Photo gallery management (reorder, delete, set primary)
+      - Social media links
+      - Category and subcategory selection
+      - Edit business listing
+      - Delete business listing with confirmation
+      - Business detail page
+      - Business card component for lists
+      - "Open now" indicator based on hours
+      - Contact action buttons (call, email, directions)
+      - Share business functionality
+      - Report business (for inappropriate content)
+      - Search vector (tsvector) for full-text search
+    </business_listings>
 
-    <custom_instructions>
-      - Global custom instructions
-      - Project-specific custom instructions
-      - Conversation-specific system prompts
-      - Custom instruction templates
-      - Preview how instructions affect responses
-    </custom_instructions>
+    <business_verification priority="6">
+      - is_verified field on businesses
+      - is_claimed field on businesses
+      - owner_id relationship to users
+      - Verified badge component
+      - "Claim this business" button for unclaimed listings
+      - Claim submission form
+      - Business claims table
+      - Admin: View pending claims
+      - Admin: Approve claim (sets owner_id)
+      - Admin: Reject claim with reason
+      - Admin: Toggle verification status
+      - Verification badge display on cards and detail pages
+    </business_verification>
 
-    <settings_preferences>
-      - Theme selection (Light, Dark, Auto)
-      - Font size adjustment
-      - Message density (compact, comfortable, spacious)
-      - Code theme selection
-      - Language preferences
-      - Accessibility options
-      - Keyboard shortcuts reference
-      - Data export options
-      - Privacy settings
-      - API key management
-    </settings_preferences>
+    <search_and_discovery priority="7">
+      - Search bar component with icon
+      - Full-text search using PostgreSQL tsvector
+      - Search results page
+      - Search result cards with key info
+      - Sort by relevance
+      - Sort by distance (when location available)
+      - Sort by rating (highest first)
+      - Sort by newest
+      - Filter by category
+      - Filter by subcategory
+      - Filter by open now
+      - Filter by verified only
+      - Filter by rating threshold
+      - Auto-expand distance (start close, expand until results found)
+      - Location detection via browser Geolocation API
+      - IP-based location fallback
+      - Country detection and default
+      - Country selector dropdown
+      - Country persistence in localStorage
+      - "Near me" results section
+      - Map view with markers
+      - Map marker clustering for many results
+      - Search suggestions/autocomplete
+      - Recent searches (localStorage)
+      - Empty state for no results
+      - Pagination or infinite scroll
+    </search_and_discovery>
 
-    <advanced_features>
-      - Temperature control slider
-      - Max tokens adjustment
-      - Top-p (nucleus sampling) control
-      - System prompt override
-      - Thinking/reasoning mode toggle
-      - Multi-modal input (text + images)
-      - Voice input (optional, mock UI)
-      - Response suggestions
-      - Related prompts
-      - Conversation branching
-    </advanced_features>
+    <homepage priority="8">
+      - Discovery-first layout with prominent search
+      - Search bar in hero section
+      - Featured/trending businesses section
+      - Businesses with high views and good ratings
+      - Upcoming events near user
+      - Browse by category section
+      - Recently added businesses
+      - Location-aware content based on detected country
+      - Responsive hero design
+    </homepage>
 
-    <collaboration>
-      - Share conversation via link (read-only)
-      - Export conversation formats
-      - Conversation templates
-      - Prompt library
-      - Share artifacts
-      - Team workspaces (mock UI)
-    </collaboration>
+    <reviews_system priority="9">
+      - Reviews table (user_id, business_id, rating, content, timestamps)
+      - Star rating input component (1-5 stars)
+      - Review text input with character limit
+      - Submit review (one per user per business)
+      - Edit own review
+      - Delete own review
+      - Review list on business detail page
+      - Review card component
+      - Sort reviews (newest, highest rated, lowest rated)
+      - Filter reviews by rating
+      - Helpful/unhelpful voting on reviews
+      - Report review for moderation
+      - Review reports table
+      - Average rating calculation and display
+      - Rating distribution chart (bar chart)
+      - Review count display
+      - Business owner response field
+      - Response UI display (indented under review)
+      - Review validation (min/max length)
+    </reviews_system>
 
-    <search_discovery>
-      - Search across all conversations
-      - Filter by project, date, model
-      - Prompt library with categories
-      - Example conversations
-      - Quick actions menu
-      - Command palette (Cmd/Ctrl+K)
-    </search_discovery>
+    <events_system priority="10">
+      - Events table with all fields
+      - Create event form
+      - Event name and description
+      - Event date and time
+      - Event location (same as business or custom address)
+      - Event type (informational vs RSVP required)
+      - RSVP enabled toggle
+      - RSVP limit (optional)
+      - Event photos
+      - Edit event
+      - Delete event
+      - Cancel event (different from delete, marks as cancelled)
+      - Event detail page
+      - Event card component
+      - RSVP button (for RSVP-enabled events)
+      - RSVP count display
+      - User RSVP status indicator
+      - Un-RSVP functionality
+      - Events browse page (/events)
+      - Filter events by date range
+      - Filter events by category (business category)
+      - Filter events by location/distance
+      - Events near me section
+      - Upcoming events on homepage
+      - Add to calendar button (generates .ics file)
+      - Share event functionality
+      - Event RSVPs table (user_id, event_id)
+    </events_system>
 
-    <usage_tracking>
-      - Token usage display per message
-      - Conversation cost estimation
-      - Daily/monthly usage dashboard
-      - Usage limits and warnings
-      - API quota tracking
-    </usage_tracking>
+    <user_dashboard priority="11">
+      - Dashboard layout with navigation
+      - "My Reviews" section listing reviews written
+      - Edit/delete review from dashboard
+      - "My Favorites" section listing saved businesses
+      - Favorite/unfavorite button on business cards
+      - Remove from favorites
+      - "My RSVPs" section listing RSVP'd events
+      - Notifications bell icon with unread count
+      - Notifications dropdown/page
+      - Notification types (new response to review, etc.)
+      - Mark notification as read
+      - Mark all as read
+      - Notifications table (user_id, type, data, read_at)
+      - Settings page
+      - Location preferences (default country)
+      - Notification preferences
+      - Account settings link
+      - Switch to business owner mode toggle
+    </user_dashboard>
 
-    <onboarding>
-      - Welcome screen for new users
-      - Feature tour highlights
-      - Example prompts to get started
-      - Quick tips and best practices
-      - Keyboard shortcuts tutorial
-    </onboarding>
+    <business_owner_dashboard priority="12">
+      - Business owner dashboard layout
+      - "My Listings" overview with cards
+      - Add new listing button
+      - Listing cards showing key stats (views, rating)
+      - Combined statistics across all listings
+      - Total impressions chart (line chart over time)
+      - Total views chart (line chart over time)
+      - Average rating display with trend indicator
+      - Reviews section (all reviews across listings)
+      - Quick respond to review from dashboard
+      - Response form modal
+      - Views by source breakdown (search, direct, category browse)
+      - Views by location breakdown (by country/region)
+      - Views by device breakdown (mobile, desktop, tablet)
+      - Comparison between listings
+      - Click-through rate display
+      - Top performing listing highlight
+      - Recent activity feed
+      - Quick actions (edit listing, view analytics)
+      - Individual listing detail page
+      - Listing-specific statistics
+      - Listing-specific reviews list
+      - Edit listing quick access
+    </business_owner_dashboard>
 
-    <accessibility>
-      - Full keyboard navigation
-      - Screen reader support
-      - ARIA labels and roles
-      - High contrast mode
-      - Focus management
-      - Reduced motion support
-    </accessibility>
+    <analytics_tracking priority="13">
+      - Business analytics table (impressions, views with metadata)
+      - Track impression when business appears in search results
+      - Track view when business detail page visited
+      - Store source (search, category, direct, map)
+      - Store user location (country, region if available)
+      - Store device type (mobile, desktop, tablet)
+      - Store timestamp
+      - Aggregate statistics calculation
+      - Charts using Recharts library
+      - Date range selector for charts
+      - Export analytics data (CSV)
+    </analytics_tracking>
 
-    <responsive_design>
-      - Mobile-first responsive layout
-      - Touch-optimized interface
-      - Collapsible sidebar on mobile
-      - Swipe gestures for navigation
-      - Adaptive artifact display
-      - Progressive Web App (PWA) support
-    </responsive_design>
+    <platform_admin priority="14">
+      - Admin layout with sidebar navigation
+      - Admin dashboard overview
+      - Total users count with trend
+      - Total businesses count with trend
+      - Total reviews count
+      - New users chart (over time)
+      - New businesses chart (over time)
+      - Users management page
+      - Users table with search and pagination
+      - User detail view
+      - Edit user role (set as admin)
+      - Deactivate/reactivate user
+      - Businesses management page
+      - Businesses table with search and filters
+      - Business detail view (admin version)
+      - Edit business (admin override)
+      - Delete business
+      - Verify business (toggle)
+      - Flag business for review
+      - Reviews moderation page
+      - Reported reviews queue
+      - View report details
+      - Dismiss report
+      - Remove review (with reason)
+      - Categories management page
+      - Categories list with CRUD
+      - Subcategories management
+      - Business claims page
+      - Claims queue with approve/reject
+      - Platform statistics and health
+    </platform_admin>
+
+    <navigation_and_layout priority="15">
+      - Top navigation bar (all pages)
+      - Logo and brand
+      - Search bar in header
+      - Country selector in header
+      - Auth buttons (Sign in/Sign up) or user menu
+      - User dropdown menu (profile, settings, sign out)
+      - Business owner mode toggle in user menu
+      - Contextual sidebar for dashboard pages
+      - Sidebar for user dashboard
+      - Sidebar for business owner dashboard
+      - Sidebar for admin pages
+      - Mobile responsive navigation
+      - Hamburger menu on mobile
+      - Breadcrumbs on interior pages
+      - Footer with links
+    </navigation_and_layout>
+
+    <location_and_internationalization priority="16">
+      - Browser Geolocation API integration
+      - IP-based geolocation fallback service
+      - Country detection on first visit
+      - Countries table or enum
+      - Country selector component
+      - Country flag icons
+      - Country persistence (localStorage)
+      - Distance calculations (Haversine formula)
+      - Distance unit preference (km/miles)
+      - Address formatting by country
+      - Phone number display formatting
+      - Timezone handling for event times
+    </location_and_internationalization>
+
+    <ui_ux_polish priority="17">
+      - Loading skeletons for all data-loading states
+      - Error boundary component
+      - 404 page design
+      - 500 error page design
+      - Empty states for all lists
+      - Confirmation dialogs for destructive actions
+      - Form validation with field-level errors
+      - Success states and feedback
+      - Smooth page transitions
+      - Hover effects on interactive elements
+      - Focus states for accessibility
+      - Keyboard navigation support
+      - Skip to main content link
+      - Alt text for all images
+      - ARIA labels for icon buttons
+      - Image optimization and lazy loading
+    </ui_ux_polish>
+
+    <notifications_system priority="18">
+      - In-app notification bell
+      - Unread notification count badge
+      - Notifications dropdown
+      - Notification types:
+        - New review on your business
+        - Response to your review
+        - Business claim approved/rejected
+        - Business verified
+      - Mark as read on view
+      - Mark all as read button
+      - Notification preferences (toggle each type)
+      - Real-time updates (polling or WebSocket - start with polling)
+    </notifications_system>
   </core_features>
 
   <database_schema>
     <tables>
       <users>
-        - id, email, name, avatar_url
-        - created_at, last_login
-        - preferences (JSON: theme, font_size, etc.)
-        - custom_instructions
+        - id (uuid, primary key)
+        - name (text)
+        - email (text, unique)
+        - email_verified (boolean)
+        - image (text, nullable)
+        - platform_role (text, nullable - null means regular user, 'admin' for admins)
+        - preferred_country (text, nullable)
+        - created_at (timestamp)
+        - updated_at (timestamp)
       </users>
-
-      <projects>
-        - id, user_id, name, description, color
-        - custom_instructions, knowledge_base_path
-        - created_at, updated_at
-        - is_archived, is_pinned
-      </projects>
-
-      <conversations>
-        - id, user_id, project_id, title
-        - model, created_at, updated_at, last_message_at
-        - is_archived, is_pinned, is_deleted
-        - settings (JSON: temperature, max_tokens, etc.)
-        - token_count, message_count
-      </conversations>
-
-      <messages>
-        - id, conversation_id, role (user/assistant/system)
-        - content, created_at, edited_at
-        - tokens, finish_reason
-        - images (JSON array of image data)
-        - parent_message_id (for branching)
-      </messages>
-
-      <artifacts>
-        - id, message_id, conversation_id
-        - type (code/html/svg/react/mermaid/text)
-        - title, identifier, language
-        - content, version
-        - created_at, updated_at
-      </artifacts>
-
-      <shared_conversations>
-        - id, conversation_id, share_token
-        - created_at, expires_at, view_count
-        - is_public
-      </shared_conversations>
-
-      <prompt_library>
-        - id, user_id, title, description
-        - prompt_template, category, tags (JSON)
-        - is_public, usage_count
-        - created_at, updated_at
-      </prompt_library>
-
-      <conversation_folders>
-        - id, user_id, project_id, name, parent_folder_id
-        - created_at, position
-      </conversation_folders>
-
-      <conversation_folder_items>
-        - id, folder_id, conversation_id
-      </conversation_folder_items>
-
-      <usage_tracking>
-        - id, user_id, conversation_id, message_id
-        - model, input_tokens, output_tokens
-        - cost_estimate, created_at
-      </usage_tracking>
-
-      <api_keys>
-        - id, user_id, key_name, api_key_hash
-        - created_at, last_used_at
-        - is_active
-      </api_keys>
+      <sessions>
+        - Better Auth managed
+      </sessions>
+      <accounts>
+        - Better Auth managed
+      </accounts>
+      <verification>
+        - Better Auth managed (email verification tokens)
+      </verification>
+      <categories>
+        - id (uuid, primary key)
+        - name (text)
+        - slug (text, unique)
+        - icon (text, nullable - lucide icon name)
+        - description (text, nullable)
+        - display_order (integer)
+        - created_at (timestamp)
+      </categories>
+      <subcategories>
+        - id (uuid, primary key)
+        - category_id (uuid, foreign key)
+        - name (text)
+        - slug (text)
+        - display_order (integer)
+      </subcategories>
+      <businesses>
+        - id (uuid, primary key)
+        - owner_id (uuid, foreign key to users, nullable)
+        - name (text)
+        - slug (text, unique)
+        - description (text)
+        - phone (text, nullable)
+        - email (text, nullable)
+        - website (text, nullable)
+        - address_line1 (text)
+        - address_line2 (text, nullable)
+        - city (text)
+        - state_province (text, nullable)
+        - postal_code (text, nullable)
+        - country_code (text)
+        - latitude (decimal)
+        - longitude (decimal)
+        - is_verified (boolean, default false)
+        - is_claimed (boolean, default false)
+        - is_active (boolean, default true)
+        - search_vector (tsvector)
+        - created_at (timestamp)
+        - updated_at (timestamp)
+      </businesses>
+      <business_categories>
+        - business_id (uuid, foreign key)
+        - category_id (uuid, foreign key)
+        - subcategory_id (uuid, foreign key, nullable)
+        - primary key (business_id, category_id)
+      </business_categories>
+      <business_hours>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - day_of_week (integer, 0-6)
+        - open_time (time, nullable)
+        - close_time (time, nullable)
+        - is_closed (boolean, default false)
+      </business_hours>
+      <business_special_hours>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - date (date)
+        - open_time (time, nullable)
+        - close_time (time, nullable)
+        - is_closed (boolean)
+        - reason (text, nullable)
+      </business_special_hours>
+      <business_services>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - name (text)
+        - description (text, nullable)
+        - price (text, nullable)
+        - display_order (integer)
+      </business_services>
+      <business_photos>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - url (text)
+        - alt_text (text, nullable)
+        - is_primary (boolean, default false)
+        - display_order (integer)
+        - created_at (timestamp)
+      </business_photos>
+      <business_social_links>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - platform (text - facebook, instagram, twitter, linkedin, etc.)
+        - url (text)
+      </business_social_links>
+      <events>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - name (text)
+        - description (text)
+        - event_date (timestamp)
+        - end_date (timestamp, nullable)
+        - location_same_as_business (boolean, default true)
+        - custom_address (text, nullable)
+        - custom_latitude (decimal, nullable)
+        - custom_longitude (decimal, nullable)
+        - requires_rsvp (boolean, default false)
+        - rsvp_limit (integer, nullable)
+        - is_cancelled (boolean, default false)
+        - created_at (timestamp)
+        - updated_at (timestamp)
+      </events>
+      <event_photos>
+        - id (uuid, primary key)
+        - event_id (uuid, foreign key)
+        - url (text)
+        - display_order (integer)
+      </event_photos>
+      <event_rsvps>
+        - id (uuid, primary key)
+        - event_id (uuid, foreign key)
+        - user_id (uuid, foreign key)
+        - created_at (timestamp)
+        - unique constraint (event_id, user_id)
+      </event_rsvps>
+      <reviews>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - user_id (uuid, foreign key)
+        - rating (integer, 1-5)
+        - content (text)
+        - owner_response (text, nullable)
+        - owner_response_at (timestamp, nullable)
+        - created_at (timestamp)
+        - updated_at (timestamp)
+        - unique constraint (business_id, user_id)
+      </reviews>
+      <review_votes>
+        - id (uuid, primary key)
+        - review_id (uuid, foreign key)
+        - user_id (uuid, foreign key)
+        - is_helpful (boolean)
+        - unique constraint (review_id, user_id)
+      </review_votes>
+      <review_reports>
+        - id (uuid, primary key)
+        - review_id (uuid, foreign key)
+        - reporter_id (uuid, foreign key to users)
+        - reason (text)
+        - status (text - pending, dismissed, removed)
+        - admin_notes (text, nullable)
+        - created_at (timestamp)
+        - resolved_at (timestamp, nullable)
+      </review_reports>
+      <favorites>
+        - id (uuid, primary key)
+        - user_id (uuid, foreign key)
+        - business_id (uuid, foreign key)
+        - created_at (timestamp)
+        - unique constraint (user_id, business_id)
+      </favorites>
+      <business_claims>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - user_id (uuid, foreign key)
+        - status (text - pending, approved, rejected)
+        - verification_details (text)
+        - admin_notes (text, nullable)
+        - created_at (timestamp)
+        - resolved_at (timestamp, nullable)
+      </business_claims>
+      <business_analytics>
+        - id (uuid, primary key)
+        - business_id (uuid, foreign key)
+        - event_type (text - impression, view)
+        - source (text - search, category, direct, map, etc.)
+        - country (text, nullable)
+        - region (text, nullable)
+        - device_type (text - desktop, mobile, tablet)
+        - user_id (uuid, nullable - for logged in users)
+        - session_id (text - for anonymous tracking)
+        - created_at (timestamp)
+      </business_analytics>
+      <notifications>
+        - id (uuid, primary key)
+        - user_id (uuid, foreign key)
+        - type (text - review_received, review_response, claim_approved, claim_rejected, business_verified)
+        - title (text)
+        - message (text)
+        - data (jsonb - related entity IDs)
+        - read_at (timestamp, nullable)
+        - created_at (timestamp)
+      </notifications>
+      <notification_preferences>
+        - id (uuid, primary key)
+        - user_id (uuid, foreign key, unique)
+        - review_received (boolean, default true)
+        - review_response (boolean, default true)
+        - claim_status (boolean, default true)
+        - business_verified (boolean, default true)
+      </notification_preferences>
     </tables>
+    <indexes>
+      - businesses: search_vector (GIN index for full-text search)
+      - businesses: (latitude, longitude) for location queries
+      - businesses: country_code for country filtering
+      - business_analytics: (business_id, created_at) for time-series queries
+      - reviews: business_id for review lookups
+      - events: (business_id, event_date) for event queries
+      - notifications: (user_id, read_at) for unread counts
+    </indexes>
   </database_schema>
 
   <api_endpoints_summary>
-    <authentication>
-      - POST /api/auth/login
-      - POST /api/auth/logout
-      - GET /api/auth/me
-      - PUT /api/auth/profile
-    </authentication>
-
-    <conversations>
-      - GET /api/conversations
-      - POST /api/conversations
-      - GET /api/conversations/:id
-      - PUT /api/conversations/:id
-      - DELETE /api/conversations/:id
-      - POST /api/conversations/:id/duplicate
-      - POST /api/conversations/:id/export
-      - PUT /api/conversations/:id/archive
-      - PUT /api/conversations/:id/pin
-      - POST /api/conversations/:id/branch
-    </conversations>
-
-    <messages>
-      - GET /api/conversations/:id/messages
-      - POST /api/conversations/:id/messages
-      - PUT /api/messages/:id
-      - DELETE /api/messages/:id
-      - POST /api/messages/:id/regenerate
-      - GET /api/messages/stream (SSE endpoint)
-    </messages>
-
-    <artifacts>
-      - GET /api/conversations/:id/artifacts
-      - GET /api/artifacts/:id
-      - PUT /api/artifacts/:id
-      - DELETE /api/artifacts/:id
-      - POST /api/artifacts/:id/fork
-      - GET /api/artifacts/:id/versions
-    </artifacts>
-
-    <projects>
-      - GET /api/projects
-      - POST /api/projects
-      - GET /api/projects/:id
-      - PUT /api/projects/:id
-      - DELETE /api/projects/:id
-      - POST /api/projects/:id/knowledge
-      - GET /api/projects/:id/conversations
-      - PUT /api/projects/:id/settings
-    </projects>
-
-    <sharing>
-      - POST /api/conversations/:id/share
-      - GET /api/share/:token
-      - DELETE /api/share/:token
-      - PUT /api/share/:token/settings
-    </sharing>
-
-    <prompts>
-      - GET /api/prompts/library
-      - POST /api/prompts/library
-      - GET /api/prompts/:id
-      - PUT /api/prompts/:id
-      - DELETE /api/prompts/:id
-      - GET /api/prompts/categories
-      - GET /api/prompts/examples
-    </prompts>
-
-    <search>
-      - GET /api/search/conversations?q=query
-      - GET /api/search/messages?q=query
-      - GET /api/search/artifacts?q=query
-      - GET /api/search/prompts?q=query
-    </search>
-
-    <folders>
-      - GET /api/folders
-      - POST /api/folders
-      - PUT /api/folders/:id
-      - DELETE /api/folders/:id
-      - POST /api/folders/:id/items
-      - DELETE /api/folders/:id/items/:conversationId
-    </folders>
-
-    <usage>
-      - GET /api/usage/daily
-      - GET /api/usage/monthly
-      - GET /api/usage/by-model
-      - GET /api/usage/conversations/:id
-    </usage>
-
-    <settings>
-      - GET /api/settings
-      - PUT /api/settings
-      - GET /api/settings/custom-instructions
-      - PUT /api/settings/custom-instructions
-    </settings>
-
-    <claude_api>
-      - POST /api/claude/chat (proxy to Claude API)
-      - POST /api/claude/chat/stream (streaming proxy)
-      - GET /api/claude/models
-      - POST /api/claude/images/upload
-    </claude_api>
+    <auth>
+      - POST /api/auth/sign-up
+      - POST /api/auth/sign-in
+      - POST /api/auth/sign-out
+      - POST /api/auth/forgot-password
+      - POST /api/auth/reset-password
+      - GET /api/auth/verify-email
+      - GET /api/auth/session
+    </auth>
+    <users>
+      - GET /api/users/me
+      - PATCH /api/users/me
+      - DELETE /api/users/me
+      - PATCH /api/users/me/password
+      - GET /api/users/me/notifications
+      - PATCH /api/users/me/notifications/:id/read
+      - PATCH /api/users/me/notifications/read-all
+      - GET /api/users/me/notification-preferences
+      - PATCH /api/users/me/notification-preferences
+    </users>
+    <businesses>
+      - GET /api/businesses (list with search, filters, pagination)
+      - GET /api/businesses/:id
+      - POST /api/businesses
+      - PATCH /api/businesses/:id
+      - DELETE /api/businesses/:id
+      - GET /api/businesses/:id/reviews
+      - GET /api/businesses/:id/events
+      - GET /api/businesses/:id/analytics (owner only)
+      - POST /api/businesses/:id/claim
+      - POST /api/businesses/:id/report
+    </businesses>
+    <reviews>
+      - POST /api/reviews
+      - PATCH /api/reviews/:id
+      - DELETE /api/reviews/:id
+      - POST /api/reviews/:id/vote
+      - POST /api/reviews/:id/report
+      - POST /api/reviews/:id/respond (owner only)
+    </reviews>
+    <events>
+      - GET /api/events (browse all events)
+      - GET /api/events/:id
+      - POST /api/events
+      - PATCH /api/events/:id
+      - DELETE /api/events/:id
+      - POST /api/events/:id/rsvp
+      - DELETE /api/events/:id/rsvp
+    </events>
+    <favorites>
+      - GET /api/favorites
+      - POST /api/favorites
+      - DELETE /api/favorites/:businessId
+    </favorites>
+    <categories>
+      - GET /api/categories
+      - GET /api/categories/:id/subcategories
+    </categories>
+    <location>
+      - GET /api/location/detect (IP-based detection)
+      - GET /api/countries
+    </location>
+    <analytics>
+      - POST /api/analytics/track
+    </analytics>
+    <admin>
+      - GET /api/admin/stats
+      - GET /api/admin/users
+      - GET /api/admin/users/:id
+      - PATCH /api/admin/users/:id
+      - GET /api/admin/businesses
+      - PATCH /api/admin/businesses/:id
+      - DELETE /api/admin/businesses/:id
+      - PATCH /api/admin/businesses/:id/verify
+      - GET /api/admin/claims
+      - PATCH /api/admin/claims/:id
+      - GET /api/admin/review-reports
+      - PATCH /api/admin/review-reports/:id
+      - GET /api/admin/categories
+      - POST /api/admin/categories
+      - PATCH /api/admin/categories/:id
+      - DELETE /api/admin/categories/:id
+      - POST /api/admin/subcategories
+      - PATCH /api/admin/subcategories/:id
+      - DELETE /api/admin/subcategories/:id
+    </admin>
   </api_endpoints_summary>
 
   <ui_layout>
     <main_structure>
-      - Three-column layout: sidebar (conversations), main (chat), panel (artifacts)
-      - Collapsible sidebar with resize handle
-      - Responsive breakpoints: mobile (single column), tablet (two column), desktop (three column)
-      - Persistent header with project/model selector
-      - Bottom input area with send button and options
+      - Top navigation bar (persistent)
+      - Main content area
+      - Contextual sidebar (dashboard/admin pages only)
+      - Footer (public pages)
     </main_structure>
-
-    <sidebar_left>
-      - New chat button (prominent)
-      - Project selector dropdown
-      - Search conversations input
-      - Conversations list (grouped by date: Today, Yesterday, Previous 7 days, etc.)
-      - Folder tree view (collapsible)
-      - Settings gear icon at bottom
-      - User profile at bottom
-    </sidebar_left>
-
-    <main_chat_area>
-      - Conversation title (editable inline)
-      - Model selector badge
-      - Message history (scrollable)
-      - Welcome screen for new conversations
-      - Suggested prompts (empty state)
-      - Input area with formatting toolbar
-      - Attachment button for images
-      - Send button with loading state
-      - Stop generation button
-    </main_chat_area>
-
-    <artifacts_panel>
-      - Artifact header with title and type badge
-      - Code editor or preview pane
-      - Tabs for multiple artifacts
-      - Full-screen toggle
-      - Download button
-      - Edit/Re-prompt button
-      - Version selector
-      - Close panel button
-    </artifacts_panel>
-
-    <modals_overlays>
-      - Settings modal (tabbed interface)
-      - Share conversation modal
-      - Export options modal
-      - Project settings modal
-      - Prompt library modal
-      - Command palette overlay
-      - Keyboard shortcuts reference
-    </modals_overlays>
+    <navigation>
+      - Logo (left)
+      - Search bar (center)
+      - Country selector (right)
+      - Auth/user menu (right)
+    </navigation>
+    <public_pages>
+      - Homepage (discovery + search)
+      - Search results
+      - Browse by category
+      - Business detail page
+      - Events browse page
+      - Event detail page
+      - Sign in / Sign up pages
+    </public_pages>
+    <user_pages>
+      - User dashboard (with sidebar)
+      - My favorites
+      - My reviews
+      - My RSVPs
+      - Notifications
+      - Profile settings
+      - Account settings
+    </user_pages>
+    <business_owner_pages>
+      - Business owner dashboard (with sidebar)
+      - My listings overview
+      - Add/edit listing
+      - Listing analytics detail
+      - Respond to reviews
+    </business_owner_pages>
+    <admin_pages>
+      - Admin dashboard (with sidebar)
+      - Users management
+      - Businesses management
+      - Reviews moderation
+      - Categories management
+      - Claims queue
+    </admin_pages>
   </ui_layout>
-
-  <design_system>
-    <color_palette>
-      - Primary: Orange/amber accent (#CC785C claude-style)
-      - Background: White (light mode), Dark gray (#1A1A1A dark mode)
-      - Surface: Light gray (#F5F5F5 light), Darker gray (#2A2A2A dark)
-      - Text: Near black (#1A1A1A light), Off-white (#E5E5E5 dark)
-      - Borders: Light gray (#E5E5E5 light), Dark gray (#404040 dark)
-      - Code blocks: Monaco editor theme
-    </color_palette>
-
-    <typography>
-      - Sans-serif system font stack (Inter, SF Pro, Roboto, system-ui)
-      - Headings: font-semibold
-      - Body: font-normal, leading-relaxed
-      - Code: Monospace (JetBrains Mono, Consolas, Monaco)
-      - Message text: text-base (16px), comfortable line-height
-    </typography>
-
-    <components>
-      <message_bubble>
-        - User messages: Right-aligned, subtle background
-        - Assistant messages: Left-aligned, no background
-        - Markdown formatting with proper spacing
-        - Inline code with bg-gray-100 background
-        - Code blocks with syntax highlighting
-        - Copy button on code blocks
-      </message_bubble>
-
-      <buttons>
-        - Primary: Orange/amber background, white text, rounded
-        - Secondary: Border style with hover fill
-        - Icon buttons: Square with hover background
-        - Disabled state: Reduced opacity, no pointer events
-      </buttons>
-
-      <inputs>
-        - Rounded borders with focus ring
-        - Textarea auto-resize
-        - Placeholder text in gray
-        - Error states in red
-        - Character counter
-      </inputs>
-
-      <cards>
-        - Subtle border or shadow
-        - Rounded corners (8px)
-        - Padding: p-4 to p-6
-        - Hover state: slight shadow increase
-      </cards>
-    </components>
-
-    <animations>
-      - Smooth transitions (150-300ms)
-      - Fade in for new messages
-      - Slide in for sidebar
-      - Typing indicator animation
-      - Loading spinner for generation
-      - Skeleton loaders for content
-    </animations>
-  </design_system>
-
-  <key_interactions>
-    <message_flow>
-      1. User types message in input field
-      2. Optional: Attach images via button
-      3. Click send or press Enter
-      4. Message appears in chat immediately
-      5. Typing indicator shows while waiting
-      6. Response streams in word by word
-      7. Code blocks render with syntax highlighting
-      8. Artifacts detected and rendered in side panel
-      9. Message complete, enable regenerate option
-    </message_flow>
-
-    <artifact_flow>
-      1. Assistant generates artifact in response
-      2. Artifact panel slides in from right
-      3. Content renders (code with highlighting or live preview)
-      4. User can edit artifact inline
-      5. "Re-prompt" button to iterate with Claude
-      6. Download or copy artifact content
-      7. Full-screen mode for detailed work
-      8. Close panel to return to chat focus
-    </artifact_flow>
-
-    <conversation_management>
-      1. Click "New Chat" to start fresh conversation
-      2. Conversations auto-save with first message
-      3. Auto-generate title from first exchange
-      4. Click title to rename inline
-      5. Drag conversations into folders
-      6. Right-click for context menu (pin, archive, delete, export)
-      7. Search filters conversations in real-time
-      8. Click conversation to switch context
-    </conversation_management>
-  </key_interactions>
 
   <implementation_steps>
     <step number="1">
-      <title>Setup Project Foundation and Database</title>
+      <title>Boilerplate Cleanup and Branding</title>
       <tasks>
-        - Initialize Express server with SQLite database
-        - Set up Claude API client with streaming support
-        - Create database schema with migrations
-        - Implement authentication endpoints
-        - Set up basic CORS and middleware
-        - Create health check endpoint
+        - Remove AI SDK packages and dependencies
+        - Remove chat page and API routes
+        - Remove OpenRouter configuration
+        - Remove unused components (diagnostics, setup-checklist, etc.)
+        - Update branding to Business Finder
+        - Clean up environment variables
+        - Update metadata and SEO tags
       </tasks>
     </step>
-
     <step number="2">
-      <title>Build Core Chat Interface</title>
+      <title>Authentication System</title>
       <tasks>
-        - Create main layout with sidebar and chat area
-        - Implement message display with markdown rendering
-        - Add streaming message support with SSE
-        - Build input area with auto-resize textarea
-        - Add code block syntax highlighting
-        - Implement stop generation functionality
-        - Add typing indicators and loading states
+        - Remove Google OAuth from Better Auth config
+        - Implement email/password provider
+        - Create sign up page with validation
+        - Create sign in page
+        - Implement email verification flow
+        - Implement password reset flow
+        - Add platform_role column to users
+        - Update auth components for new flow
       </tasks>
     </step>
-
     <step number="3">
-      <title>Conversation Management</title>
+      <title>Glassmorphism Design System</title>
       <tasks>
-        - Create conversation list in sidebar
-        - Implement new conversation creation
-        - Add conversation switching
-        - Build conversation rename functionality
-        - Implement delete with confirmation
-        - Add conversation search
-        - Create conversation grouping by date
+        - Define design tokens in Tailwind config
+        - Create glass utility classes
+        - Implement warm color palette
+        - Update all UI components with glass variants
+        - Redesign header and footer
+        - Create consistent button styles
+        - Design form inputs with glass effect
+        - Implement dark mode variants
       </tasks>
     </step>
-
     <step number="4">
-      <title>Artifacts System</title>
+      <title>Database Schema and Categories</title>
       <tasks>
-        - Build artifact detection from Claude responses
-        - Create artifact rendering panel
-        - Implement code artifact viewer
-        - Add HTML/SVG live preview
-        - Build artifact editing interface
-        - Add artifact versioning
-        - Implement full-screen artifact view
+        - Create all database tables with Drizzle
+        - Set up indexes for performance
+        - Create migration files
+        - Seed categories with common business types
+        - Seed subcategories
+        - Test database connections and queries
       </tasks>
     </step>
-
     <step number="5">
-      <title>Projects and Organization</title>
+      <title>Business Listings Core</title>
       <tasks>
-        - Create projects CRUD endpoints
-        - Build project selector UI
-        - Implement project-specific custom instructions
-        - Add folder system for conversations
-        - Create drag-and-drop organization
-        - Build project settings panel
+        - Implement business CRUD API
+        - Create business form (multi-step)
+        - Implement photo upload
+        - Create business detail page
+        - Implement business cards
+        - Add operating hours management
+        - Implement services/products
+        - Add social links
       </tasks>
     </step>
-
     <step number="6">
-      <title>Advanced Features</title>
+      <title>Search and Discovery</title>
       <tasks>
-        - Add model selection dropdown
-        - Implement temperature and parameter controls
-        - Build image upload functionality
-        - Create message editing and regeneration
-        - Add conversation branching
-        - Implement export functionality
+        - Set up PostgreSQL full-text search
+        - Implement search API with filters
+        - Create search results page
+        - Implement category browsing
+        - Add location detection (browser + IP)
+        - Implement country selector
+        - Add map integration with Leaflet
+        - Create homepage with discovery features
       </tasks>
     </step>
-
     <step number="7">
-      <title>Settings and Customization</title>
+      <title>Reviews System</title>
       <tasks>
-        - Build settings modal with tabs
-        - Implement theme switching (light/dark)
-        - Add custom instructions management
-        - Create keyboard shortcuts
-        - Build prompt library
-        - Add usage tracking dashboard
+        - Implement reviews API
+        - Create star rating component
+        - Create review form
+        - Display reviews on business page
+        - Implement review voting
+        - Add review reporting
+        - Implement business owner responses
+        - Calculate and display ratings
       </tasks>
     </step>
-
     <step number="8">
-      <title>Sharing and Collaboration</title>
+      <title>Events System</title>
       <tasks>
-        - Implement conversation sharing with tokens
-        - Create public share view
-        - Add export to multiple formats
-        - Build prompt templates
-        - Create example conversations
+        - Implement events API
+        - Create event form
+        - Implement RSVP functionality
+        - Create events browse page
+        - Add event cards
+        - Implement event detail page
+        - Add calendar export
+        - Display events on homepage
       </tasks>
     </step>
-
     <step number="9">
+      <title>User Dashboard</title>
+      <tasks>
+        - Create dashboard layout with sidebar
+        - Implement favorites functionality
+        - Display user's reviews
+        - Display user's RSVPs
+        - Create notifications system
+        - Implement settings pages
+        - Add notification preferences
+      </tasks>
+    </step>
+    <step number="10">
+      <title>Business Owner Dashboard</title>
+      <tasks>
+        - Create business owner dashboard layout
+        - Display all owned listings
+        - Implement analytics tracking
+        - Create analytics charts with Recharts
+        - Add source/location/device breakdowns
+        - Implement review management
+        - Add quick response functionality
+      </tasks>
+    </step>
+    <step number="11">
+      <title>Business Verification and Claims</title>
+      <tasks>
+        - Implement claim submission
+        - Create claims management for admin
+        - Implement verification toggle
+        - Display verified badge
+        - Add claim status notifications
+      </tasks>
+    </step>
+    <step number="12">
+      <title>Platform Admin</title>
+      <tasks>
+        - Create admin layout
+        - Implement admin dashboard with stats
+        - Create users management
+        - Create businesses management
+        - Implement review moderation
+        - Create categories management
+        - Add claims queue
+      </tasks>
+    </step>
+    <step number="13">
       <title>Polish and Optimization</title>
       <tasks>
-        - Optimize for mobile responsiveness
-        - Add command palette (Cmd+K)
-        - Implement comprehensive keyboard navigation
-        - Add onboarding flow
-        - Create accessibility improvements
-        - Performance optimization and caching
+        - Add loading states and skeletons
+        - Implement error boundaries
+        - Create 404 and error pages
+        - Add empty states
+        - Optimize images and performance
+        - Add accessibility features
+        - Test responsive design
+        - Fix edge cases
       </tasks>
     </step>
   </implementation_steps>
 
   <success_criteria>
     <functionality>
-      - Streaming chat responses work smoothly
-      - Artifact detection and rendering accurate
-      - Conversation management intuitive and reliable
-      - Project organization clear and useful
-      - Image upload and display working
-      - All CRUD operations functional
+      - All user types can complete their core workflows
+      - Search returns relevant results with proper filtering
+      - Location detection works accurately
+      - Reviews and ratings function correctly
+      - Events with RSVP work end-to-end
+      - Business owner analytics display real data
+      - Admin can manage all platform entities
+      - All data persists correctly (no mock data)
     </functionality>
-
     <user_experience>
-      - Interface matches claude.ai design language
-      - Responsive on all device sizes
-      - Smooth animations and transitions
-      - Fast response times and minimal lag
-      - Intuitive navigation and workflows
-      - Clear feedback for all actions
+      - Glassmorphism design is consistent and professional
+      - Navigation is intuitive and clear
+      - Forms provide helpful validation feedback
+      - Loading states prevent confusion
+      - Mobile experience is fully functional
+      - Dark mode works throughout
     </user_experience>
-
     <technical_quality>
-      - Clean, maintainable code structure
-      - Proper error handling throughout
-      - Secure API key management
-      - Optimized database queries
-      - Efficient streaming implementation
-      - Comprehensive testing coverage
+      - TypeScript strict mode passes
+      - No console errors in normal operation
+      - API responses are fast (<1s for most operations)
+      - Database queries are optimized
+      - Authentication is secure
+      - Role-based access is enforced
     </technical_quality>
-
     <design_polish>
-      - Consistent with claude.ai visual design
-      - Beautiful typography and spacing
-      - Smooth animations and micro-interactions
-      - Excellent contrast and accessibility
-      - Professional, polished appearance
-      - Dark mode fully implemented
+      - Warm glassmorphism aesthetic throughout
+      - Consistent spacing and typography
+      - Smooth transitions and hover effects
+      - Professional appearance suitable for production
     </design_polish>
   </success_criteria>
+
+  <prerequisites>
+    <environment_setup>
+      - PostgreSQL database (local or cloud)
+      - Node.js 18+ with pnpm
+      - BETTER_AUTH_SECRET (32+ character secret)
+      - POSTGRES_URL connection string
+    </environment_setup>
+    <removed_requirements>
+      - GOOGLE_CLIENT_ID (removed - using email/password)
+      - GOOGLE_CLIENT_SECRET (removed)
+      - OPENROUTER_API_KEY (removed - no AI features)
+    </removed_requirements>
+  </prerequisites>
+
+  <additional_notes>
+    <monetization>Not implemented in this version - all listings are free</monetization>
+    <verification>Business verification happens outside the app; admins toggle status manually</verification>
+    <internationalization>Country-based filtering, not full i18n/localization</internationalization>
+  </additional_notes>
 </project_specification>
