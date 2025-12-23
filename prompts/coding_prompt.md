@@ -87,6 +87,25 @@ curl -s http://localhost:8765/features/next
 Focus on completing one feature perfectly and completing its testing steps in this session before moving on to other features.
 It's ok if you only complete one feature in this session, as there will be more sessions later that continue to make progress.
 
+#### If You Cannot Implement the Feature
+
+Sometimes a feature cannot be implemented yet. Valid reasons to skip:
+
+- **Dependency**: The feature requires another feature to be implemented first
+- **Missing prerequisite**: Core infrastructure (auth, database schema) isn't ready
+- **Unclear requirements**: The feature description is ambiguous and needs clarification
+
+If you encounter a blocker, **skip the feature** to move it to the end of the queue:
+
+```bash
+# Skip feature #42 - moves it to end of priority queue
+curl -X POST http://localhost:8765/features/42/skip
+```
+
+After skipping, call `/features/next` again to get the next feature to work on.
+
+**Do NOT skip features just because they seem difficult.** Only skip when there is a genuine dependency or blocker. Document why you skipped in `claude-progress.txt`.
+
 ### STEP 5: IMPLEMENT THE FEATURE
 
 Implement the chosen feature thoroughly:
@@ -296,6 +315,9 @@ curl -s "http://localhost:8765/features?passes=true&limit=3&random=true"
 curl -X PATCH http://localhost:8765/features/{id} \
   -H "Content-Type: application/json" \
   -d '{"passes": true}'
+
+# 5. Skip a feature (moves to end of queue) - ONLY when blocked by dependency
+curl -X POST http://localhost:8765/features/{id}/skip
 ```
 
 ### FORBIDDEN API Calls (NEVER do these):

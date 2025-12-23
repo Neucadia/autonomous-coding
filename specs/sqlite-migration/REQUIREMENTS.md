@@ -38,6 +38,7 @@ cat feature_list.json | grep '"passes": false' | wc -l
    - `GET /features/{id}` - Get a specific feature
    - `POST /features/bulk` - Create multiple features in one request
    - `PATCH /features/{id}` - Update feature status (only `passes` field)
+   - `POST /features/{id}/skip` - Skip a feature (moves to end of priority queue)
    - `GET /health` - Health check
 
 3. **Server Lifecycle**

@@ -62,6 +62,7 @@ FastAPI endpoints:
 | `POST` | `/features` | Create single feature |
 | `POST` | `/features/bulk` | Create features in batch |
 | `PATCH` | `/features/{id}` | Update feature (only `passes` field) |
+| `POST` | `/features/{id}/skip` | Skip feature (moves to end of priority queue) |
 | `DELETE` | `/features/{id}` | Delete feature (use with caution) |
 | `GET` | `/health` | Health check |
 
@@ -214,6 +215,19 @@ Request:
 ```
 Response: `{"created": 340}`
 
+### POST /features/{id}/skip
+Response:
+```json
+{
+  "id": 42,
+  "name": "Feature name",
+  "old_priority": 5,
+  "new_priority": 341,
+  "message": "Feature 'Feature name' moved to end of queue"
+}
+```
+Use this when a feature has dependencies on other features that aren't implemented yet.
+
 ## Design Decisions
 
 ### 1. No jq Dependency
@@ -227,6 +241,9 @@ Added `random=true` parameter to return random passing features instead of alway
 
 ### 4. Strict API Usage Rules in Prompt
 Added explicit ALLOWED and FORBIDDEN API calls section to prevent agents from browsing the feature catalog.
+
+### 5. Skip Endpoint for Dependency Handling
+Added `POST /features/{id}/skip` to handle cases where a feature cannot be implemented due to dependencies. The endpoint moves the feature to the end of the priority queue (sets priority to max + 1), allowing the agent to work on other features first. This prevents the agent from getting stuck in a loop when it encounters a feature with unmet dependencies.
 
 ## Migration Strategy
 

@@ -76,6 +76,15 @@ class HealthResponse(BaseModel):
     database: str
 
 
+class SkipResponse(BaseModel):
+    """Schema for skip feature response."""
+    id: int
+    name: str
+    old_priority: int
+    new_priority: int
+    message: str
+
+
 def create_app(project_dir: Path) -> FastAPI:
     """
     Create and configure the FastAPI application.
@@ -270,6 +279,48 @@ def create_app(project_dir: Path) -> FastAPI:
         db.refresh(feature)
 
         return feature.to_dict()
+
+    @app.post("/features/{feature_id}/skip", response_model=SkipResponse)
+    def skip_feature(feature_id: int, db: Session = Depends(get_db)):
+        """
+        Skip a feature by moving it to the end of the priority queue.
+
+        Use this when a feature cannot be implemented yet due to:
+        - Dependencies on other features that aren't implemented yet
+        - External blockers (missing assets, unclear requirements)
+        - Technical prerequisites that need to be addressed first
+
+        The feature's priority is set to max_priority + 1, so it will be
+        returned last by /features/next. Other features will be worked on first.
+        """
+        feature = db.query(Feature).filter(Feature.id == feature_id).first()
+
+        if feature is None:
+            raise HTTPException(status_code=404, detail="Feature not found")
+
+        if feature.passes:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot skip a feature that is already passing",
+            )
+
+        old_priority = feature.priority
+
+        # Get max priority and set this feature to max + 1
+        max_priority = db.query(Feature.priority).order_by(Feature.priority.desc()).first()
+        new_priority = (max_priority[0] + 1) if max_priority else 1
+
+        feature.priority = new_priority
+        db.commit()
+        db.refresh(feature)
+
+        return {
+            "id": feature.id,
+            "name": feature.name,
+            "old_priority": old_priority,
+            "new_priority": new_priority,
+            "message": f"Feature '{feature.name}' moved to end of queue",
+        }
 
     @app.delete("/features/{feature_id}", status_code=204)
     def delete_feature(feature_id: int, db: Session = Depends(get_db)):
