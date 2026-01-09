@@ -18,6 +18,7 @@ from prompts import (
     has_project_prompts,
     get_project_prompts_dir,
 )
+from agent import request_stop
 
 
 # Directory containing generated projects
@@ -76,6 +77,7 @@ def display_menu(projects: list[str]) -> None:
 
     if projects:
         print("[2] Continue existing project")
+        print("[3] Stop running project (graceful)")
 
     print("[q] Quit")
     print()
@@ -306,6 +308,44 @@ def create_new_project_flow() -> str | None:
     return project_name
 
 
+def stop_project_flow(projects: list[str]) -> None:
+    """
+    Flow for requesting a graceful stop of a running project.
+
+    Shows the project list and creates a stop file for the selected project.
+    The running agent will stop after completing its current feature.
+    """
+    print("\n" + "-" * 40)
+    print("  Stop Running Project")
+    print("-" * 40)
+    print("\nSelect a project to stop. The agent will finish")
+    print("its current feature before stopping.\n")
+
+    for i, project in enumerate(projects, 1):
+        print(f"  [{i}] {project}")
+
+    print("\n  [b] Back to main menu")
+    print()
+
+    while True:
+        choice = input("Select project number: ").strip().lower()
+
+        if choice == 'b':
+            return
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(projects):
+                project_name = projects[idx]
+                project_dir = GENERATIONS_DIR / project_name
+                request_stop(project_dir)
+                print()
+                return
+            print(f"Please enter a number between 1 and {len(projects)}")
+        except ValueError:
+            print("Invalid input. Enter a number or 'b' to go back.")
+
+
 def run_agent(project_name: str) -> None:
     """Run the autonomous agent with the given project."""
     project_dir = GENERATIONS_DIR / project_name
@@ -357,6 +397,9 @@ def main() -> None:
             selected = get_project_choice(projects)
             if selected:
                 run_agent(selected)
+
+        elif choice == '3' and projects:
+            stop_project_flow(projects)
 
         else:
             print("Invalid option. Please try again.")

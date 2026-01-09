@@ -23,6 +23,33 @@ from prompts import (
 
 # Configuration
 AUTO_CONTINUE_DELAY_SECONDS = 3
+STOP_FILE_NAME = ".stop_requested"
+
+
+def check_stop_requested(project_dir: Path) -> bool:
+    """
+    Check if a graceful stop has been requested.
+
+    Returns True if stop file exists, and removes it.
+    """
+    stop_file = project_dir / STOP_FILE_NAME
+    if stop_file.exists():
+        stop_file.unlink()
+        return True
+    return False
+
+
+def request_stop(project_dir: Path) -> None:
+    """
+    Request a graceful stop for a running project.
+
+    Creates a stop file that the agent will check before starting
+    the next feature.
+    """
+    stop_file = project_dir / STOP_FILE_NAME
+    stop_file.touch()
+    print(f"Stop requested for project at: {project_dir}")
+    print("The agent will stop after completing the current feature.")
 
 
 async def run_agent_session(
@@ -151,6 +178,15 @@ async def run_autonomous_agent(
 
     while True:
         iteration += 1
+
+        # Check for graceful stop request
+        if check_stop_requested(project_dir):
+            print("\n" + "=" * 70)
+            print("  GRACEFUL STOP REQUESTED")
+            print("=" * 70)
+            print("\nStopping after completing previous feature.")
+            print("Run the script again to resume.")
+            break
 
         # Check max iterations
         if max_iterations and iteration > max_iterations:
