@@ -28,6 +28,7 @@ class Feature(Base):
     description = Column(Text, nullable=False)
     steps = Column(JSON, nullable=False)  # Stored as JSON array
     passes = Column(Boolean, default=False, index=True)
+    in_progress = Column(Boolean, default=False, index=True)
 
     def to_dict(self) -> dict:
         """Convert feature to dictionary for JSON serialization."""
@@ -39,6 +40,7 @@ class Feature(Base):
             "description": self.description,
             "steps": self.steps,
             "passes": self.passes,
+            "in_progress": self.in_progress,
         }
 
 

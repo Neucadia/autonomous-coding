@@ -1,8 +1,10 @@
 """
-JSON to SQLite Migration
-========================
+Database Migrations
+===================
 
-Automatically migrates existing feature_list.json files to SQLite database.
+Handles database migrations:
+- JSON to SQLite migration for legacy feature_list.json files
+- Schema migrations for adding new columns
 """
 
 import json
@@ -11,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker, Session
 
 from api.database import Feature
@@ -150,5 +153,48 @@ def export_to_json(
         print(f"Exported {len(features_data)} features to {output_file}")
         return output_file
 
+    finally:
+        session.close()
+
+
+def migrate_add_in_progress_column(
+    project_dir: Path,
+    session_maker: sessionmaker,
+) -> bool:
+    """
+    Add in_progress column to existing databases.
+
+    This migration adds the in_progress boolean column to track which feature
+    is currently being worked on. This allows crash recovery by resuming
+    work on in-progress features.
+
+    Args:
+        project_dir: Directory containing the project
+        session_maker: SQLAlchemy session maker
+
+    Returns:
+        True if migration was performed, False if column already exists
+    """
+    session: Session = session_maker()
+    try:
+        # Check if column already exists using PRAGMA
+        result = session.execute(text("PRAGMA table_info(features)"))
+        columns = [row[1] for row in result.fetchall()]
+
+        if "in_progress" in columns:
+            return False  # Column already exists
+
+        # Add the column with default value of 0 (False)
+        session.execute(
+            text("ALTER TABLE features ADD COLUMN in_progress BOOLEAN DEFAULT 0")
+        )
+        session.commit()
+        print("Added in_progress column to features table")
+        return True
+
+    except Exception as e:
+        session.rollback()
+        print(f"Error adding in_progress column: {e}")
+        return False
     finally:
         session.close()

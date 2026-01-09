@@ -30,7 +30,7 @@ from sqlalchemy.sql.expression import func
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from api.database import Feature, create_database
-from api.migration import migrate_json_to_sqlite
+from api.migration import migrate_json_to_sqlite, migrate_add_in_progress_column
 
 # Configuration from environment
 PROJECT_DIR = Path(os.environ.get("PROJECT_DIR", ".")).resolve()
@@ -81,8 +81,9 @@ async def server_lifespan(server: FastMCP):
     # Initialize database
     _engine, _session_maker = create_database(PROJECT_DIR)
 
-    # Run migration if needed (converts legacy JSON to SQLite)
-    migrate_json_to_sqlite(PROJECT_DIR, _session_maker)
+    # Run migrations
+    migrate_json_to_sqlite(PROJECT_DIR, _session_maker)  # Legacy JSON to SQLite
+    migrate_add_in_progress_column(PROJECT_DIR, _session_maker)  # Add in_progress column
 
     yield
 
@@ -131,15 +132,34 @@ def feature_get_stats() -> str:
 def feature_get_next() -> str:
     """Get the highest-priority pending feature to work on.
 
-    Returns the feature with the lowest priority number that has passes=false.
-    Use this at the start of each coding session to determine what to implement next.
+    If a feature is already marked as in_progress (from a previous crashed session),
+    returns that feature to allow resuming interrupted work.
+
+    Otherwise, returns the feature with the lowest priority number that has passes=false
+    and marks it as in_progress.
 
     Returns:
-        JSON with feature details (id, priority, category, name, description, steps, passes)
+        JSON with feature details (id, priority, category, name, description, steps, passes, in_progress)
         or error message if all features are passing.
+        If resuming, includes "resumed": true and a message.
     """
     session = get_session()
     try:
+        # First, check for any in-progress feature (resume interrupted work)
+        in_progress_feature = (
+            session.query(Feature)
+            .filter(Feature.in_progress == True)
+            .first()
+        )
+
+        if in_progress_feature:
+            return json.dumps({
+                **in_progress_feature.to_dict(),
+                "resumed": True,
+                "message": "Resuming previously started feature"
+            }, indent=2)
+
+        # Get next pending feature by priority
         feature = (
             session.query(Feature)
             .filter(Feature.passes == False)
@@ -149,6 +169,11 @@ def feature_get_next() -> str:
 
         if feature is None:
             return json.dumps({"error": "All features are passing! No more work to do."})
+
+        # Mark as in_progress
+        feature.in_progress = True
+        session.commit()
+        session.refresh(feature)
 
         return json.dumps(feature.to_dict(), indent=2)
     finally:
@@ -212,6 +237,7 @@ def feature_mark_passing(
             return json.dumps({"error": f"Feature with ID {feature_id} not found"})
 
         feature.passes = True
+        feature.in_progress = False  # Clear in_progress flag
         session.commit()
         session.refresh(feature)
 
@@ -257,6 +283,7 @@ def feature_skip(
         new_priority = (max_priority_result[0] + 1) if max_priority_result else 1
 
         feature.priority = new_priority
+        feature.in_progress = False  # Clear in_progress flag
         session.commit()
         session.refresh(feature)
 

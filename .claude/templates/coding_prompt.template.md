@@ -14,25 +14,35 @@ pwd
 # 2. List files to understand project structure
 ls -la
 
-# 3. Read the project specification to understand what you're building
+# 3. Check for uncommitted changes from previous session
+git status
+git diff --stat
+
+# 4. Read the project specification to understand what you're building
 cat app_spec.txt
 
-# 4. Read progress notes from previous sessions
+# 5. Read progress notes from previous sessions
 cat claude-progress.txt
 
-# 5. Check recent git history
+# 6. Check recent git history
 git log --oneline -20
 ```
 
 Then use MCP tools to check feature status:
 
 ```
-# 6. Get progress statistics (passing/total counts)
+# 7. Get progress statistics (passing/total counts)
 Use the feature_get_stats tool
 
-# 7. Get the next feature to work on
+# 8. Get the next feature to work on (may resume an in-progress feature)
 Use the feature_get_next tool
 ```
+
+**If feature_get_next returns a feature with `"resumed": true`:**
+- This feature was started in a previous session that crashed or was interrupted
+- Check uncommitted changes (`git status`) - they likely relate to this feature
+- Continue working on this feature, building on any existing progress
+- Do NOT start fresh - leverage the uncommitted changes
 
 Understanding the `app_spec.txt` is critical - it contains the full requirements
 for the application you're building.
