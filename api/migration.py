@@ -198,3 +198,60 @@ def migrate_add_in_progress_column(
         return False
     finally:
         session.close()
+
+
+def migrate_add_failure_tracking_columns(
+    project_dir: Path,
+    session_maker: sessionmaker,
+) -> bool:
+    """
+    Add failure_count and last_error columns to existing databases.
+
+    This migration adds columns for tracking consecutive failures on features:
+    - failure_count: Number of consecutive session failures
+    - last_error: Last error message encountered
+
+    These enable stuck loop detection and auto-skipping of problematic features.
+
+    Args:
+        project_dir: Directory containing the project
+        session_maker: SQLAlchemy session maker
+
+    Returns:
+        True if migration was performed, False if columns already exist
+    """
+    session: Session = session_maker()
+    try:
+        # Check existing columns using PRAGMA
+        result = session.execute(text("PRAGMA table_info(features)"))
+        columns = [row[1] for row in result.fetchall()]
+
+        added_any = False
+
+        # Add failure_count column if missing
+        if "failure_count" not in columns:
+            session.execute(
+                text("ALTER TABLE features ADD COLUMN failure_count INTEGER DEFAULT 0")
+            )
+            print("Added failure_count column to features table")
+            added_any = True
+
+        # Add last_error column if missing
+        if "last_error" not in columns:
+            session.execute(
+                text("ALTER TABLE features ADD COLUMN last_error TEXT")
+            )
+            print("Added last_error column to features table")
+            added_any = True
+
+        if added_any:
+            session.commit()
+
+        return added_any
+
+    except Exception as e:
+        session.rollback()
+        print(f"Error adding failure tracking columns: {e}")
+        return False
+    finally:
+        session.close()

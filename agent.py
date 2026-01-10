@@ -25,6 +25,9 @@ from prompts import (
 AUTO_CONTINUE_DELAY_SECONDS = 3
 STOP_FILE_NAME = ".stop_requested"
 
+# Stuck loop detection
+MAX_CONSECUTIVE_SAME_ERRORS = 5
+
 
 def check_stop_requested(project_dir: Path) -> bool:
     """
@@ -52,6 +55,34 @@ def request_stop(project_dir: Path) -> None:
     print("The agent will stop after completing the current feature.")
 
 
+def _normalize_error_for_comparison(error_str: str) -> str:
+    """
+    Normalize error string for stuck loop detection.
+
+    Extracts the key part of the error message to detect repeated patterns
+    even if details vary slightly.
+    """
+    # Truncate to first 100 chars for comparison
+    normalized = error_str[:100].strip().lower()
+    return normalized
+
+
+def _check_stuck_loop(error_history: list[str]) -> bool:
+    """
+    Check if the error history indicates a stuck loop.
+
+    Returns True if the last N errors are all identical (same normalized message).
+    """
+    if len(error_history) < MAX_CONSECUTIVE_SAME_ERRORS:
+        return False
+
+    recent = error_history[-MAX_CONSECUTIVE_SAME_ERRORS:]
+    normalized = [_normalize_error_for_comparison(e) for e in recent]
+
+    # All recent errors are the same
+    return len(set(normalized)) == 1
+
+
 async def run_agent_session(
     client: ClaudeSDKClient,
     message: str,
@@ -69,8 +100,12 @@ async def run_agent_session(
         (status, response_text) where status is:
         - "continue" if agent should continue working
         - "error" if an error occurred
+        - "stuck" if stuck loop detected (repeated identical errors)
     """
     print("Sending prompt to Claude Agent SDK...\n")
+
+    # Track consecutive errors for stuck loop detection
+    error_history: list[str] = []
 
     try:
         # Send the query
@@ -114,8 +149,24 @@ async def run_agent_session(
                             # Show errors (truncated)
                             error_str = str(result_content)[:500]
                             print(f"   [Error] {error_str}", flush=True)
+
+                            # Track error for stuck loop detection
+                            error_history.append(error_str)
+
+                            # Check for stuck loop
+                            if _check_stuck_loop(error_history):
+                                print("\n" + "=" * 70)
+                                print("  STUCK LOOP DETECTED")
+                                print("=" * 70)
+                                print(f"\nSame error repeated {MAX_CONSECUTIVE_SAME_ERRORS} times:")
+                                print(f"  {error_history[-1][:100]}...")
+                                print("\nEnding session for clean restart.")
+                                print("The MCP servers will reconnect in the next session.")
+                                print("-" * 70 + "\n")
+                                return "stuck", f"Stuck loop detected: {error_history[-1][:200]}"
                         else:
-                            # Tool succeeded - just show brief confirmation
+                            # Tool succeeded - reset error history
+                            error_history.clear()
                             print("   [Done]", flush=True)
 
         print("\n" + "-" * 70 + "\n")
@@ -215,6 +266,12 @@ async def run_autonomous_agent(
         # Handle status
         if status == "continue":
             print(f"\nAgent will auto-continue in {AUTO_CONTINUE_DELAY_SECONDS}s...")
+            print_progress_summary(project_dir)
+            await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
+
+        elif status == "stuck":
+            print("\nSession ended due to stuck loop detection")
+            print("Starting fresh session with reconnected MCP servers...")
             print_progress_summary(project_dir)
             await asyncio.sleep(AUTO_CONTINUE_DELAY_SECONDS)
 

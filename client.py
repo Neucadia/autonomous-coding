@@ -24,6 +24,7 @@ FEATURE_MCP_TOOLS = [
     "mcp__features__feature_mark_passing",
     "mcp__features__feature_skip",
     "mcp__features__feature_create_bulk",
+    "mcp__features__feature_record_failure",  # For stuck loop recovery
 ]
 
 # Playwright MCP tools for browser automation
@@ -144,7 +145,8 @@ def create_client(project_dir: Path, model: str):
             ],
             mcp_servers={
                 "playwright": {"command": "npx", "args": ["@playwright/mcp@latest", "--viewport-size", "1280x720"]},
-                "features": {
+                # "playwright": {"command": "npx", "args": ["@playwright/mcp@latest", "--headless"]},
+		"features": {
                     "command": sys.executable,  # Use the same Python that's running this script
                     "args": ["-m", "mcp_server.feature_mcp"],
                     "env": {

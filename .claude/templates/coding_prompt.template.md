@@ -189,7 +189,31 @@ Use browser automation tools:
 - [ ] Loading states appeared during API calls
 - [ ] Error states handle failures gracefully
 
-### STEP 6.6: MOCK DATA DETECTION SWEEP
+### STEP 6.6: HANDLING TOOL FAILURES
+
+#### Playwright "Not connected" or Timeout Errors
+
+If browser tools repeatedly fail with "Not connected" or timeout errors:
+
+1. **Do NOT retry more than 3 times** - Repeated failures indicate the MCP server may have disconnected
+2. **Record the failure** using `feature_record_failure` tool with the feature ID and error message
+3. **Update progress notes** in `claude-progress.txt` documenting the issue
+4. **Commit your progress** so work isn't lost
+5. **Let the session end** - The system will detect the stuck loop and restart with fresh MCP connections
+
+The session will automatically restart and resume the in-progress feature with working browser tools.
+
+#### General Error Recovery
+
+If ANY tool fails repeatedly (3+ times with the same error):
+1. Stop retrying - the issue likely requires a fresh session
+2. Call `feature_record_failure` with the feature ID and error message
+3. Commit any progress made
+4. Let the session end naturally
+
+**Never retry the same failing operation more than 3 times in a row.**
+
+### STEP 6.7: MOCK DATA DETECTION SWEEP (OPTIONAL)
 
 **Run this sweep AFTER EVERY FEATURE before marking it as passing:**
 
@@ -359,6 +383,9 @@ feature_mark_passing with feature_id={id}
 
 # 5. Skip a feature (moves to end of queue) - ONLY when blocked by dependency
 feature_skip with feature_id={id}
+
+# 6. Record a failure (when tools repeatedly fail) - increments failure count
+feature_record_failure with feature_id={id} and error_message="description"
 ```
 
 ### RULES:

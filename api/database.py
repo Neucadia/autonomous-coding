@@ -29,6 +29,9 @@ class Feature(Base):
     steps = Column(JSON, nullable=False)  # Stored as JSON array
     passes = Column(Boolean, default=False, index=True)
     in_progress = Column(Boolean, default=False, index=True)
+    # Failure tracking for stuck loop detection
+    failure_count = Column(Integer, default=0)
+    last_error = Column(Text, nullable=True)
 
     def to_dict(self) -> dict:
         """Convert feature to dictionary for JSON serialization."""
@@ -41,6 +44,8 @@ class Feature(Base):
             "steps": self.steps,
             "passes": self.passes,
             "in_progress": self.in_progress,
+            "failure_count": self.failure_count or 0,
+            "last_error": self.last_error,
         }
 
 
