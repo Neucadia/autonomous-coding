@@ -20,10 +20,10 @@ fi
 
 echo "[OK] Claude CLI found"
 
-# Check if user has credentials
-CLAUDE_CREDS="$HOME/.claude/.credentials.json"
-if [ -f "$CLAUDE_CREDS" ]; then
-    echo "[OK] Claude credentials found"
+# Check if user is authenticated by running a quick test
+# Using --print with a simple prompt to verify auth works
+if claude --print "hello" &> /dev/null; then
+    echo "[OK] Claude authenticated"
 else
     echo "[!] Not authenticated with Claude"
     echo ""
@@ -39,8 +39,8 @@ else
         echo ""
         claude login
 
-        # Check if login succeeded
-        if [ -f "$CLAUDE_CREDS" ]; then
+        # Verify login succeeded
+        if claude --print "hello" &> /dev/null; then
             echo ""
             echo "[OK] Login successful!"
         else
@@ -66,6 +66,9 @@ fi
 
 # Activate the virtual environment
 source venv/bin/activate
+
+# Upgrade pip in the virtual environment
+pip install --upgrade pip --quiet
 
 # Install dependencies
 echo "Installing dependencies..."
