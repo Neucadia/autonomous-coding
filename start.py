@@ -8,17 +8,24 @@ Supports two paths for new projects:
 2. Manual path: Edit template files directly, then continue
 """
 
+import asyncio
 import os
 import sys
 import subprocess
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load environment variables from .env file (if it exists)
+load_dotenv()
 
 from prompts import (
     scaffold_project_prompts,
     has_project_prompts,
     get_project_prompts_dir,
 )
-from agent import request_stop
+from agent import request_stop, run_add_features_session
+from progress import has_features
 
 
 # Directory containing generated projects
@@ -77,7 +84,8 @@ def display_menu(projects: list[str]) -> None:
 
     if projects:
         print("[2] Continue existing project")
-        print("[3] Stop running project (graceful)")
+        print("[3] Add new features to existing project")
+        print("[4] Stop running project (graceful)")
 
     print("[q] Quit")
     print()
@@ -346,6 +354,155 @@ def stop_project_flow(projects: list[str]) -> None:
             print("Invalid input. Enter a number or 'b' to go back.")
 
 
+def get_feature_count() -> int | None:
+    """Ask user how many features to add."""
+    print("\nHow many features would you like to add?")
+    print("(Press Enter for default of 15, or enter a number)")
+    print()
+
+    while True:
+        choice = input("Feature count [15]: ").strip()
+
+        if choice == '':
+            return 15
+
+        try:
+            count = int(choice)
+            if count < 1:
+                print("Please enter a positive number.")
+                continue
+            if count > 100:
+                confirm = input(f"Add {count} features? That's a lot! [y/N]: ").strip().lower()
+                if confirm != 'y':
+                    continue
+            return count
+        except ValueError:
+            print("Invalid input. Enter a number or press Enter for default.")
+
+
+def get_feature_description() -> str | None:
+    """Ask user for a description of what features to add."""
+    print("\n" + "-" * 40)
+    print("  Describe Features to Add")
+    print("-" * 40)
+    print("\nDescribe what features you want to add.")
+    print("Be specific about the functionality, pages, or behaviors.")
+    print("\nExamples:")
+    print("  - Add user authentication with login, logout, and password reset")
+    print("  - Add a dashboard with charts showing sales data")
+    print("  - Add form validation for all input fields")
+    print("\nEnter your description (or 'b' to go back):")
+    print()
+
+    lines = []
+    print("(Enter an empty line when done)")
+    while True:
+        try:
+            line = input()
+            if line.strip().lower() == 'b' and not lines:
+                return None
+            if line == '' and lines:
+                break
+            lines.append(line)
+        except KeyboardInterrupt:
+            print("\n\nCancelled.")
+            return None
+
+    description = '\n'.join(lines).strip()
+    if not description:
+        print("No description provided.")
+        return None
+
+    return description
+
+
+def add_features_flow(projects: list[str]) -> None:
+    """
+    Flow for adding new features to an existing project.
+
+    Shows the project list, asks for feature count, and runs the add features agent.
+    """
+    print("\n" + "-" * 40)
+    print("  Add New Features to Existing Project")
+    print("-" * 40)
+    print("\nSelect a project to add features to.\n")
+
+    # Filter to only show projects with existing features
+    projects_with_features = []
+    for project in projects:
+        project_dir = GENERATIONS_DIR / project
+        if has_features(project_dir):
+            projects_with_features.append(project)
+
+    if not projects_with_features:
+        print("No projects with existing features found.")
+        print("Use 'Continue existing project' first to initialize features.")
+        input("\nPress Enter to continue...")
+        return
+
+    for i, project in enumerate(projects_with_features, 1):
+        print(f"  [{i}] {project}")
+
+    print("\n  [b] Back to main menu")
+    print()
+
+    while True:
+        choice = input("Select project number: ").strip().lower()
+
+        if choice == 'b':
+            return
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(projects_with_features):
+                project_name = projects_with_features[idx]
+                break
+            print(f"Please enter a number between 1 and {len(projects_with_features)}")
+        except ValueError:
+            print("Invalid input. Enter a number or 'b' to go back.")
+
+    # Ask for feature description first
+    feature_description = get_feature_description()
+    if feature_description is None:
+        return
+
+    # Ask for feature count
+    feature_count = get_feature_count()
+    if feature_count is None:
+        return
+
+    # Run add features session
+    project_dir = GENERATIONS_DIR / project_name
+    run_add_features(project_name, feature_count, feature_description)
+
+
+def run_add_features(project_name: str, feature_count: int, feature_description: str) -> None:
+    """Run the add features agent session for a project."""
+    project_dir = GENERATIONS_DIR / project_name
+
+    print(f"\nAdding {feature_count} features to project: {project_name}")
+    print("-" * 50)
+    print(f"\nFeature description:\n{feature_description}")
+    print("-" * 50)
+
+    # Default model (same as autonomous_agent_demo.py)
+    model = "claude-opus-4-5-20251101"
+
+    try:
+        asyncio.run(
+            run_add_features_session(
+                project_dir=project_dir,
+                model=model,
+                feature_count=feature_count,
+                feature_description=feature_description,
+            )
+        )
+    except KeyboardInterrupt:
+        print("\n\nAdd features interrupted.")
+    except Exception as e:
+        print(f"\nError adding features: {e}")
+
+
 def run_agent(project_name: str) -> None:
     """Run the autonomous agent with the given project."""
     project_dir = GENERATIONS_DIR / project_name
@@ -399,6 +556,9 @@ def main() -> None:
                 run_agent(selected)
 
         elif choice == '3' and projects:
+            add_features_flow(projects)
+
+        elif choice == '4' and projects:
             stop_project_flow(projects)
 
         else:

@@ -75,6 +75,28 @@ def get_coding_prompt(project_dir: Path | None = None) -> str:
     return load_prompt("coding_prompt", project_dir)
 
 
+def get_add_features_prompt(
+    project_dir: Path | None = None,
+    feature_count: int = 15,
+    feature_description: str = "",
+) -> str:
+    """
+    Load the add features prompt (project-specific if available).
+
+    Args:
+        project_dir: Project directory for project-specific prompts
+        feature_count: Number of features to add (substituted into template)
+        feature_description: User's description of what features to add
+
+    Returns:
+        The prompt with placeholders replaced
+    """
+    prompt = load_prompt("add_features_prompt", project_dir)
+    prompt = prompt.replace("{{feature_count}}", str(feature_count))
+    prompt = prompt.replace("{{feature_description}}", feature_description)
+    return prompt
+
+
 def get_app_spec(project_dir: Path) -> str:
     """
     Load the app spec from the project.

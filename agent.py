@@ -16,6 +16,7 @@ from progress import print_session_header, print_progress_summary, has_features
 from prompts import (
     get_initializer_prompt,
     get_coding_prompt,
+    get_add_features_prompt,
     copy_spec_to_project,
     has_project_prompts,
 )
@@ -175,6 +176,58 @@ async def run_agent_session(
     except Exception as e:
         print(f"Error during agent session: {e}")
         return "error", str(e)
+
+
+async def run_add_features_session(
+    project_dir: Path,
+    model: str,
+    feature_count: int = 15,
+    feature_description: str = "",
+) -> None:
+    """
+    Run a single session to add new features to an existing project.
+
+    Args:
+        project_dir: Directory for the project
+        model: Claude model to use
+        feature_count: Number of features to add (default 15)
+        feature_description: User's description of what features to add
+    """
+    print("\n" + "=" * 70)
+    print("  ADD FEATURES SESSION")
+    print("=" * 70)
+    print(f"\nProject directory: {project_dir}")
+    print(f"Model: {model}")
+    print(f"Features to add: {feature_count}")
+    print()
+
+    # Verify project exists and has features
+    if not has_features(project_dir):
+        print("Error: This project has no existing features.")
+        print("Use 'Create new project' or 'Continue existing project' first.")
+        return
+
+    print_progress_summary(project_dir)
+    print()
+
+    # Create client
+    client = create_client(project_dir, model)
+
+    # Get the add features prompt
+    prompt = get_add_features_prompt(project_dir, feature_count, feature_description)
+
+    # Run single session
+    print("Starting add features session...\n")
+    async with client:
+        status, response = await run_agent_session(client, prompt, project_dir)
+
+    # Show final status
+    print("\n" + "=" * 70)
+    print("  ADD FEATURES COMPLETE")
+    print("=" * 70)
+    print_progress_summary(project_dir)
+    print("\nNew features have been added to the database.")
+    print("Run 'Continue existing project' to implement them.")
 
 
 async def run_autonomous_agent(
