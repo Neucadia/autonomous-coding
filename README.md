@@ -1,3 +1,13 @@
+# Neucadia Changes
+  
+Description: Stuck loop detection & failure tracking - Auto-detects repeated failures, tracks per-feature failure counts, auto-skips after 5 failures [1f74b88](https://github.com/Neucadia/autonomous-coding/commit/1f74b88)
+
+Description: Use CLAUDE_CODE_OAUTH_TOKEN in .env file with `claude setup-token`
+
+Description: Add graceful stop functionality for running projects [07e5dc0](https://github.com/Neucadia/autonomous-coding/commit/07e5dc0)
+
+Description: Add in_progress tracking for crash recovery [516768d](https://github.com/Neucadia/autonomous-coding/commit/516768d)
+
 # Autonomous Coding Agent
 
 A long-running autonomous coding agent powered by the Claude Agent SDK. This tool can build complete applications over multiple sessions using a two-agent pattern (initializer + coding agent).
