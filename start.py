@@ -25,7 +25,13 @@ from prompts import (
     get_project_prompts_dir,
 )
 from agent import request_stop, run_add_features_session
-from progress import has_features
+from progress import (
+    has_features,
+    get_skipped_features,
+    approve_skipped_feature,
+    reject_skipped_feature,
+    count_skipped_features,
+)
 
 
 # Directory containing generated projects
@@ -86,6 +92,7 @@ def display_menu(projects: list[str]) -> None:
         print("[2] Continue existing project")
         print("[3] Add new features to existing project")
         print("[4] Stop running project (graceful)")
+        print("[5] Review skipped features")
 
     print("[q] Quit")
     print()
@@ -476,6 +483,154 @@ def add_features_flow(projects: list[str]) -> None:
     run_add_features(project_name, feature_count, feature_description)
 
 
+def review_skipped_features_flow(projects: list[str]) -> None:
+    """
+    Flow for reviewing and approving/rejecting skipped features.
+
+    Shows projects with skipped features, then allows the user to
+    approve (re-queue) or reject (permanently skip) each one.
+    """
+    print("\n" + "-" * 40)
+    print("  Review Skipped Features")
+    print("-" * 40)
+
+    # Find projects with skipped features
+    projects_with_skipped = []
+    for project in projects:
+        project_dir = GENERATIONS_DIR / project
+        count = count_skipped_features(project_dir)
+        if count > 0:
+            projects_with_skipped.append((project, count))
+
+    if not projects_with_skipped:
+        print("\nNo projects have skipped features awaiting review.")
+        input("\nPress Enter to continue...")
+        return
+
+    print("\nProjects with skipped features:\n")
+    for i, (project, count) in enumerate(projects_with_skipped, 1):
+        print(f"  [{i}] {project} ({count} skipped)")
+
+    print("\n  [b] Back to main menu")
+    print()
+
+    # Get project selection
+    while True:
+        choice = input("Select project number: ").strip().lower()
+
+        if choice == 'b':
+            return
+
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(projects_with_skipped):
+                project_name = projects_with_skipped[idx][0]
+                break
+            print(f"Please enter a number between 1 and {len(projects_with_skipped)}")
+        except ValueError:
+            print("Invalid input. Enter a number or 'b' to go back.")
+
+    # Review skipped features for selected project
+    project_dir = GENERATIONS_DIR / project_name
+    review_project_skipped_features(project_dir, project_name)
+
+
+def review_project_skipped_features(project_dir: Path, project_name: str) -> None:
+    """Review skipped features for a specific project."""
+    while True:
+        skipped = get_skipped_features(project_dir)
+
+        if not skipped:
+            print("\nNo more skipped features to review!")
+            input("\nPress Enter to continue...")
+            return
+
+        print("\n" + "-" * 50)
+        print(f"  Skipped Features for: {project_name}")
+        print("-" * 50)
+        print(f"\n{len(skipped)} feature(s) awaiting review:\n")
+
+        for i, feature in enumerate(skipped, 1):
+            print(f"  [{i}] {feature['name']}")
+            print(f"      Category: {feature['category']}")
+            if feature['skip_reason']:
+                print(f"      Reason: {feature['skip_reason']}")
+            print()
+
+        print("  [a] Approve all (re-queue all features)")
+        print("  [r] Reject all (permanently skip all features)")
+        print("  [b] Back to project selection")
+        print()
+
+        choice = input("Select feature number or action: ").strip().lower()
+
+        if choice == 'b':
+            return
+        elif choice == 'a':
+            # Approve all
+            confirm = input(f"Approve all {len(skipped)} features? [y/N]: ").strip().lower()
+            if confirm == 'y':
+                for feature in skipped:
+                    approve_skipped_feature(project_dir, feature['id'])
+                print(f"\nApproved {len(skipped)} feature(s). They will be worked on again.")
+        elif choice == 'r':
+            # Reject all
+            confirm = input(f"Reject all {len(skipped)} features? This is permanent! [y/N]: ").strip().lower()
+            if confirm == 'y':
+                for feature in skipped:
+                    reject_skipped_feature(project_dir, feature['id'])
+                print(f"\nRejected {len(skipped)} feature(s). They will not be implemented.")
+        else:
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(skipped):
+                    feature = skipped[idx]
+                    review_single_feature(project_dir, feature)
+                else:
+                    print(f"Please enter a number between 1 and {len(skipped)}")
+            except ValueError:
+                print("Invalid input.")
+
+
+def review_single_feature(project_dir: Path, feature: dict) -> None:
+    """Review a single skipped feature."""
+    print("\n" + "=" * 50)
+    print(f"  Feature #{feature['id']}: {feature['name']}")
+    print("=" * 50)
+    print(f"\nCategory: {feature['category']}")
+    print(f"\nDescription:\n{feature['description']}")
+    if feature['skip_reason']:
+        print(f"\nSkip Reason: {feature['skip_reason']}")
+    print("\n" + "-" * 50)
+    print("\n[a] Approve - Re-queue this feature to be worked on")
+    print("[r] Reject - Permanently skip this feature")
+    print("[s] Skip - Decide later")
+    print()
+
+    while True:
+        choice = input("Action [a/r/s]: ").strip().lower()
+
+        if choice == 'a':
+            if approve_skipped_feature(project_dir, feature['id']):
+                print(f"\nFeature '{feature['name']}' approved and re-queued.")
+            else:
+                print("\nFailed to approve feature.")
+            return
+        elif choice == 'r':
+            confirm = input("Are you sure you want to permanently reject this feature? [y/N]: ").strip().lower()
+            if confirm == 'y':
+                if reject_skipped_feature(project_dir, feature['id']):
+                    print(f"\nFeature '{feature['name']}' rejected and removed from queue.")
+                else:
+                    print("\nFailed to reject feature.")
+            return
+        elif choice == 's':
+            print("\nSkipping for now...")
+            return
+        else:
+            print("Invalid choice. Enter 'a' to approve, 'r' to reject, or 's' to skip.")
+
+
 def run_add_features(project_name: str, feature_count: int, feature_description: str) -> None:
     """Run the add features agent session for a project."""
     project_dir = GENERATIONS_DIR / project_name
@@ -560,6 +715,9 @@ def main() -> None:
 
         elif choice == '4' and projects:
             stop_project_flow(projects)
+
+        elif choice == '5' and projects:
+            review_skipped_features_flow(projects)
 
         else:
             print("Invalid option. Please try again.")

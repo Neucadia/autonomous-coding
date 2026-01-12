@@ -32,6 +32,10 @@ class Feature(Base):
     # Failure tracking for stuck loop detection
     failure_count = Column(Integer, default=0)
     last_error = Column(Text, nullable=True)
+    # Skip tracking - when user requests to skip a feature
+    skipped = Column(Boolean, default=False, index=True)
+    approved = Column(Boolean, default=False, index=True)  # User approved the skip
+    skip_reason = Column(Text, nullable=True)  # Why the feature was skipped
 
     def to_dict(self) -> dict:
         """Convert feature to dictionary for JSON serialization."""
@@ -46,6 +50,9 @@ class Feature(Base):
             "in_progress": self.in_progress,
             "failure_count": self.failure_count or 0,
             "last_error": self.last_error,
+            "skipped": self.skipped or False,
+            "approved": self.approved or False,
+            "skip_reason": self.skip_reason,
         }
 
 

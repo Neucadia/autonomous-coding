@@ -34,6 +34,7 @@ from api.migration import (
     migrate_json_to_sqlite,
     migrate_add_in_progress_column,
     migrate_add_failure_tracking_columns,
+    migrate_add_skip_tracking_columns,
 )
 
 # Maximum consecutive failures before auto-skipping a feature
@@ -92,6 +93,7 @@ async def server_lifespan(server: FastMCP):
     migrate_json_to_sqlite(PROJECT_DIR, _session_maker)  # Legacy JSON to SQLite
     migrate_add_in_progress_column(PROJECT_DIR, _session_maker)  # Add in_progress column
     migrate_add_failure_tracking_columns(PROJECT_DIR, _session_maker)  # Add failure tracking
+    migrate_add_skip_tracking_columns(PROJECT_DIR, _session_maker)  # Add skip tracking
 
     yield
 
@@ -194,11 +196,13 @@ def feature_get_next() -> str:
                 "attempts_remaining": MAX_FEATURE_FAILURES - failure_count,
             }, indent=2)
 
-        # Get next pending feature by priority (skip features with too many failures)
+        # Get next pending feature by priority
+        # Skip features with too many failures OR features that are skipped but not approved
         feature = (
             session.query(Feature)
             .filter(Feature.passes == False)
             .filter((Feature.failure_count == None) | (Feature.failure_count < MAX_FEATURE_FAILURES))
+            .filter((Feature.skipped == False) | (Feature.skipped == None) | (Feature.approved == True))
             .order_by(Feature.priority.asc(), Feature.id.asc())
             .first()
         )
@@ -211,10 +215,25 @@ def feature_get_next() -> str:
                 .filter(Feature.failure_count >= MAX_FEATURE_FAILURES)
                 .count()
             )
-            if failed_features > 0:
+            # Check if there are features skipped and awaiting approval
+            skipped_features = (
+                session.query(Feature)
+                .filter(Feature.passes == False)
+                .filter(Feature.skipped == True)
+                .filter(Feature.approved == False)
+                .count()
+            )
+            if failed_features > 0 or skipped_features > 0:
+                message_parts = []
+                if failed_features > 0:
+                    message_parts.append(f"{failed_features} features blocked due to failures")
+                if skipped_features > 0:
+                    message_parts.append(f"{skipped_features} features skipped awaiting user approval")
                 return json.dumps({
-                    "error": f"All remaining features have failed too many times ({failed_features} features blocked). Manual intervention required.",
-                    "blocked_count": failed_features
+                    "error": f"No available features. {'. '.join(message_parts)}. Manual intervention required.",
+                    "blocked_count": failed_features,
+                    "skipped_count": skipped_features,
+                    "message": "Run ./start.sh and select 'Review skipped features' to approve or reject skipped features."
                 })
             return json.dumps({"error": "All features are passing! No more work to do."})
 
@@ -306,7 +325,8 @@ def feature_mark_passing(
 
 @mcp.tool()
 def feature_skip(
-    feature_id: Annotated[int, Field(description="The ID of the feature to skip", ge=1)]
+    feature_id: Annotated[int, Field(description="The ID of the feature to skip", ge=1)],
+    reason: Annotated[str, Field(description="The reason for skipping this feature", default="")] = ""
 ) -> str:
     """Skip a feature by moving it to the end of the priority queue.
 
@@ -315,16 +335,22 @@ def feature_skip(
     - External blockers (missing assets, unclear requirements)
     - Technical prerequisites that need to be addressed first
     - Repeated tool failures (e.g., Playwright disconnection)
+    - User explicitly requesting to skip the feature
 
     The feature's priority is set to max_priority + 1, so it will be
     worked on after all other pending features. The failure_count is
     also reset to give the feature a fresh start when it's retried.
 
+    IMPORTANT: When a feature is skipped, it is marked with skipped=True.
+    Skipped features require user approval before they will be worked on again.
+    Users can review and approve skipped features via the start.py menu.
+
     Args:
         feature_id: The ID of the feature to skip
+        reason: The reason for skipping (will be stored for user review)
 
     Returns:
-        JSON with skip details: id, name, old_priority, new_priority, message
+        JSON with skip details: id, name, old_priority, new_priority, skipped, message
     """
     session = get_session()
     try:
@@ -346,6 +372,9 @@ def feature_skip(
         feature.in_progress = False  # Clear in_progress flag
         feature.failure_count = 0  # Reset failure count for fresh retry
         feature.last_error = None  # Clear last error
+        feature.skipped = True  # Mark as skipped - requires user approval
+        feature.approved = False  # Reset approval status
+        feature.skip_reason = reason[:500] if reason else None  # Store reason (truncated)
         session.commit()
         session.refresh(feature)
 
@@ -354,7 +383,9 @@ def feature_skip(
             "name": feature.name,
             "old_priority": old_priority,
             "new_priority": new_priority,
-            "message": f"Feature '{feature.name}' moved to end of queue"
+            "skipped": True,
+            "skip_reason": feature.skip_reason,
+            "message": f"Feature '{feature.name}' skipped and moved to end of queue. Requires user approval to retry."
         }, indent=2)
     finally:
         session.close()
@@ -464,6 +495,126 @@ def feature_create_bulk(
     except Exception as e:
         session.rollback()
         return json.dumps({"error": str(e)})
+    finally:
+        session.close()
+
+
+@mcp.tool()
+def feature_get_skipped() -> str:
+    """Get all features that have been skipped and are awaiting user approval.
+
+    Returns features where skipped=True and approved=False. These features
+    will not be worked on until the user reviews and approves them via
+    the start.py menu.
+
+    Use this to check if there are any features that need user attention.
+
+    Returns:
+        JSON with: features (list of skipped feature objects), count (int)
+    """
+    session = get_session()
+    try:
+        features = (
+            session.query(Feature)
+            .filter(Feature.skipped == True)
+            .filter(Feature.approved == False)
+            .filter(Feature.passes == False)
+            .order_by(Feature.priority.asc())
+            .all()
+        )
+
+        return json.dumps({
+            "features": [f.to_dict() for f in features],
+            "count": len(features),
+            "message": f"{len(features)} feature(s) awaiting approval" if features else "No skipped features awaiting approval"
+        }, indent=2)
+    finally:
+        session.close()
+
+
+@mcp.tool()
+def feature_approve(
+    feature_id: Annotated[int, Field(description="The ID of the skipped feature to approve", ge=1)]
+) -> str:
+    """Approve a skipped feature, allowing it to be worked on again.
+
+    When a feature is skipped, it requires user approval before the agent
+    will attempt to implement it again. This tool marks the feature as
+    approved, clearing the skipped status so it can be picked up by
+    feature_get_next.
+
+    Args:
+        feature_id: The ID of the skipped feature to approve
+
+    Returns:
+        JSON with the updated feature details, or error if not found.
+    """
+    session = get_session()
+    try:
+        feature = session.query(Feature).filter(Feature.id == feature_id).first()
+
+        if feature is None:
+            return json.dumps({"error": f"Feature with ID {feature_id} not found"})
+
+        if not feature.skipped:
+            return json.dumps({"error": f"Feature {feature_id} is not skipped"})
+
+        if feature.passes:
+            return json.dumps({"error": f"Feature {feature_id} is already passing"})
+
+        # Clear skipped status and mark as approved
+        feature.skipped = False
+        feature.approved = True
+        feature.skip_reason = None  # Clear the reason since it's approved
+        session.commit()
+        session.refresh(feature)
+
+        return json.dumps({
+            **feature.to_dict(),
+            "message": f"Feature '{feature.name}' approved and ready to be worked on"
+        }, indent=2)
+    finally:
+        session.close()
+
+
+@mcp.tool()
+def feature_reject_skip(
+    feature_id: Annotated[int, Field(description="The ID of the skipped feature to reject/remove", ge=1)]
+) -> str:
+    """Reject a skipped feature, permanently removing it from the queue.
+
+    Use this when a skipped feature should never be implemented (e.g., it's
+    out of scope, no longer needed, or fundamentally impossible).
+
+    The feature will be marked as both skipped and approved, and passes will
+    remain False. It will not appear in the queue again.
+
+    Args:
+        feature_id: The ID of the skipped feature to reject
+
+    Returns:
+        JSON with the updated feature details, or error if not found.
+    """
+    session = get_session()
+    try:
+        feature = session.query(Feature).filter(Feature.id == feature_id).first()
+
+        if feature is None:
+            return json.dumps({"error": f"Feature with ID {feature_id} not found"})
+
+        if not feature.skipped:
+            return json.dumps({"error": f"Feature {feature_id} is not skipped"})
+
+        # Mark as approved (reviewed) but keep skipped=True
+        # This means it won't show up in pending features or approval queue
+        feature.approved = True
+        session.commit()
+        session.refresh(feature)
+
+        return json.dumps({
+            **feature.to_dict(),
+            "message": f"Feature '{feature.name}' rejected and removed from queue"
+        }, indent=2)
     finally:
         session.close()
 

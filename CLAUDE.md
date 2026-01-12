@@ -156,8 +156,12 @@ python -m mcp_server.feature_mcp
 - `feature_get_next()`: Get highest-priority pending feature
 - `feature_get_for_regression(limit=3)`: Get random passing features for testing
 - `feature_mark_passing(feature_id)`: Mark feature as implemented
-- `feature_skip(feature_id)`: Move feature to end of queue
+- `feature_skip(feature_id, reason)`: Skip feature and mark for user review
 - `feature_create_bulk(features)`: Create multiple features (initializer only)
+- `feature_get_skipped()`: Get features skipped and awaiting user approval
+- `feature_approve(feature_id)`: Approve a skipped feature to be worked on again
+- `feature_reject_skip(feature_id)`: Permanently reject a skipped feature
+- `feature_record_failure(feature_id, error_message)`: Record a failure for stuck loop detection
 
 ## Prompt Template System
 
@@ -204,7 +208,26 @@ class Feature:
     description: str     # What this feature/test verifies
     steps: list[str]     # Step-by-step test instructions (JSON array)
     passes: bool         # Implementation status
+    in_progress: bool    # Currently being worked on
+    failure_count: int   # Consecutive failures (for stuck loop detection)
+    last_error: str      # Last error message
+    skipped: bool        # Feature was skipped by user request
+    approved: bool       # User approved the skip (reviewed)
+    skip_reason: str     # Why the feature was skipped
 ```
+
+### Skip Workflow
+
+When a feature cannot be implemented (dependencies, blockers, user request), use `feature_skip(feature_id, reason)`:
+
+1. **Feature is skipped**: Moves to end of queue, marked `skipped=True`, `approved=False`
+2. **Awaiting review**: Skipped features won't be worked on until user approves
+3. **User reviews**: Via `./start.sh` menu option "Review skipped features"
+4. **Approve or Reject**:
+   - **Approve**: Feature re-queued (`skipped=False`, `approved=True`)
+   - **Reject**: Feature permanently removed from queue (`skipped=True`, `approved=True`)
+
+**Important**: When you skip a feature, always provide a clear reason so the user understands why it was skipped when they review it.
 
 ### Progress Tracking
 
@@ -264,3 +287,17 @@ The feature count target is specified in `app_spec.txt`. Standard tiers:
 **Features marked passing incorrectly**: Use SQLite to manually update: `UPDATE features SET passes = 0 WHERE id = X;`
 
 **Session hangs on first run**: Initializer is generating hundreds of features (takes 10-20+ minutes)
+
+**"No available features" but features exist**: Features may be skipped and awaiting user approval. Run `./start.sh` and select "Review skipped features" to approve or reject them.
+
+**Skipped features queries**:
+```sql
+-- View all skipped features awaiting approval
+SELECT id, name, skip_reason FROM features WHERE skipped = 1 AND approved = 0 AND passes = 0;
+
+-- Manually approve a skipped feature
+UPDATE features SET skipped = 0, approved = 1, skip_reason = NULL WHERE id = X;
+
+-- Manually reject a skipped feature
+UPDATE features SET approved = 1 WHERE id = X AND skipped = 1;
+```

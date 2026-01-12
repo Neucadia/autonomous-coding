@@ -255,3 +255,70 @@ def migrate_add_failure_tracking_columns(
         return False
     finally:
         session.close()
+
+
+def migrate_add_skip_tracking_columns(
+    project_dir: Path,
+    session_maker: sessionmaker,
+) -> bool:
+    """
+    Add skipped, approved, and skip_reason columns to existing databases.
+
+    This migration adds columns for tracking user-requested skips:
+    - skipped: Whether the feature was explicitly skipped by user request
+    - approved: Whether the user has approved this skip (reviewed and accepted)
+    - skip_reason: The reason given for skipping the feature
+
+    These enable a workflow where users can review skipped features and
+    decide whether to approve the skip or re-queue the feature.
+
+    Args:
+        project_dir: Directory containing the project
+        session_maker: SQLAlchemy session maker
+
+    Returns:
+        True if migration was performed, False if columns already exist
+    """
+    session: Session = session_maker()
+    try:
+        # Check existing columns using PRAGMA
+        result = session.execute(text("PRAGMA table_info(features)"))
+        columns = [row[1] for row in result.fetchall()]
+
+        added_any = False
+
+        # Add skipped column if missing
+        if "skipped" not in columns:
+            session.execute(
+                text("ALTER TABLE features ADD COLUMN skipped BOOLEAN DEFAULT 0")
+            )
+            print("Added skipped column to features table")
+            added_any = True
+
+        # Add approved column if missing
+        if "approved" not in columns:
+            session.execute(
+                text("ALTER TABLE features ADD COLUMN approved BOOLEAN DEFAULT 0")
+            )
+            print("Added approved column to features table")
+            added_any = True
+
+        # Add skip_reason column if missing
+        if "skip_reason" not in columns:
+            session.execute(
+                text("ALTER TABLE features ADD COLUMN skip_reason TEXT")
+            )
+            print("Added skip_reason column to features table")
+            added_any = True
+
+        if added_any:
+            session.commit()
+
+        return added_any
+
+    except Exception as e:
+        session.rollback()
+        print(f"Error adding skip tracking columns: {e}")
+        return False
+    finally:
+        session.close()

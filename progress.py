@@ -213,3 +213,156 @@ def print_progress_summary(project_dir: Path) -> None:
         send_progress_webhook(passing, total, project_dir)
     else:
         print("\nProgress: No features in database yet")
+
+
+def get_skipped_features(project_dir: Path) -> list[dict]:
+    """
+    Get all features that are skipped and awaiting approval.
+
+    Args:
+        project_dir: Directory containing the project
+
+    Returns:
+        List of dicts with feature details for skipped features
+    """
+    db_file = project_dir / "features.db"
+    if not db_file.exists():
+        return []
+
+    try:
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        # Check if skipped column exists
+        cursor.execute("PRAGMA table_info(features)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "skipped" not in columns:
+            conn.close()
+            return []
+
+        cursor.execute(
+            """SELECT id, priority, category, name, description, skip_reason
+               FROM features
+               WHERE skipped = 1 AND (approved = 0 OR approved IS NULL) AND passes = 0
+               ORDER BY priority ASC"""
+        )
+        features = [
+            {
+                "id": row[0],
+                "priority": row[1],
+                "category": row[2],
+                "name": row[3],
+                "description": row[4],
+                "skip_reason": row[5],
+            }
+            for row in cursor.fetchall()
+        ]
+        conn.close()
+        return features
+    except Exception as e:
+        print(f"[Database error in get_skipped_features: {e}]")
+        return []
+
+
+def approve_skipped_feature(project_dir: Path, feature_id: int) -> bool:
+    """
+    Approve a skipped feature, allowing it to be worked on again.
+
+    Args:
+        project_dir: Directory containing the project
+        feature_id: The ID of the feature to approve
+
+    Returns:
+        True if successful, False otherwise
+    """
+    db_file = project_dir / "features.db"
+    if not db_file.exists():
+        return False
+
+    try:
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE features
+               SET skipped = 0, approved = 1, skip_reason = NULL
+               WHERE id = ?""",
+            (feature_id,)
+        )
+        conn.commit()
+        success = cursor.rowcount > 0
+        conn.close()
+        return success
+    except Exception as e:
+        print(f"[Database error in approve_skipped_feature: {e}]")
+        return False
+
+
+def reject_skipped_feature(project_dir: Path, feature_id: int) -> bool:
+    """
+    Reject a skipped feature, permanently removing it from the queue.
+
+    The feature stays marked as skipped but is also marked as approved
+    (reviewed), meaning it won't appear in the approval queue or the
+    pending features.
+
+    Args:
+        project_dir: Directory containing the project
+        feature_id: The ID of the feature to reject
+
+    Returns:
+        True if successful, False otherwise
+    """
+    db_file = project_dir / "features.db"
+    if not db_file.exists():
+        return False
+
+    try:
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        cursor.execute(
+            """UPDATE features
+               SET approved = 1
+               WHERE id = ? AND skipped = 1""",
+            (feature_id,)
+        )
+        conn.commit()
+        success = cursor.rowcount > 0
+        conn.close()
+        return success
+    except Exception as e:
+        print(f"[Database error in reject_skipped_feature: {e}]")
+        return False
+
+
+def count_skipped_features(project_dir: Path) -> int:
+    """
+    Count features that are skipped and awaiting approval.
+
+    Args:
+        project_dir: Directory containing the project
+
+    Returns:
+        Number of skipped features awaiting approval
+    """
+    db_file = project_dir / "features.db"
+    if not db_file.exists():
+        return 0
+
+    try:
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        # Check if skipped column exists
+        cursor.execute("PRAGMA table_info(features)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if "skipped" not in columns:
+            conn.close()
+            return 0
+
+        cursor.execute(
+            """SELECT COUNT(*) FROM features
+               WHERE skipped = 1 AND (approved = 0 OR approved IS NULL) AND passes = 0"""
+        )
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+    except Exception:
+        return 0
