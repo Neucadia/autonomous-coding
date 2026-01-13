@@ -362,6 +362,61 @@ Test like a human user with mouse and keyboard. Don't take shortcuts by using Ja
 
 ---
 
+## EXPO/REACT NATIVE TESTING (FOR MOBILE APPS)
+
+**If this project uses Expo or React Native, you CAN test mobile features!**
+
+You have access to the Expo MCP server which provides automation capabilities for testing Expo apps. Do NOT assume you cannot test mobile features just because you don't have Xcode or Android Studio.
+
+### Setting Up for Expo Testing
+
+1. Ensure the mobile app is running with the Expo MCP enabled:
+   ```bash
+   # Install expo-mcp in the mobile app if not present
+   npx expo install expo-mcp
+
+   # Start the dev server with MCP enabled
+   EXPO_UNSTABLE_MCP_SERVER=1 npx expo start
+   ```
+
+2. Use the Expo MCP `learn` tool to get detailed guidance:
+   ```
+   Use the mcp__expo-mcp__learn tool with topic="expo-router"
+   ```
+
+### Available Expo MCP Automation Tools
+
+When the dev server is running with `EXPO_UNSTABLE_MCP_SERVER=1`, these local automation tools are available:
+
+- `automation_take_screenshot` - Capture full device screenshots
+- `automation_tap` - Tap screen coordinates
+- `automation_tap_by_testid` - Tap views by testID
+- `automation_take_screenshot_by_testid` - Screenshot specific views by testID
+- `automation_find_view_by_testid` - Locate views by testID
+- `expo_router_sitemap` - Display expo-router sitemap output
+- `open_devtools` - Launch React Native DevTools
+
+### How to Test Expo Features
+
+1. **Start the Expo dev server** with MCP enabled (see above)
+2. **Use `automation_take_screenshot`** to see the current state of the app
+3. **Use `automation_tap_by_testid`** to interact with elements (add `testID` props to components)
+4. **Take screenshots after each action** to verify the result
+5. **Use `mcp__expo-mcp__search_documentation`** to look up Expo APIs if needed
+
+### DO NOT Skip Mobile Features
+
+**Do NOT skip features just because they are "mobile" or "Expo" features.** Use the Expo MCP tools to test them. Only skip if:
+- The Expo dev server cannot start due to actual errors
+- The specific feature truly requires native device capabilities not available through MCP
+
+**Before skipping any mobile feature**, first:
+1. Try to start the Expo dev server with MCP enabled
+2. Use `mcp__expo-mcp__search_documentation` to learn about the feature
+3. Attempt to test using the automation tools
+
+---
+
 ## FEATURE TOOL USAGE RULES (CRITICAL - DO NOT VIOLATE)
 
 The feature tools exist to reduce token usage. **DO NOT make exploratory queries.**
