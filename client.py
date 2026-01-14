@@ -27,6 +27,25 @@ FEATURE_MCP_TOOLS = [
     "mcp__features__feature_record_failure",  # For stuck loop recovery
 ]
 
+# Expo MCP tools for React Native/Expo development
+EXPO_MCP_TOOLS = [
+    # Remote capabilities (documentation & package management)
+    "mcp__expo__learn",
+    "mcp__expo__search_documentation",
+    "mcp__expo__add_library",
+    "mcp__expo__generate_claude_md",
+    "mcp__expo__generate_agents_md",
+
+    # Local capabilities (requires local dev server with expo-mcp)
+    "mcp__expo__expo_router_sitemap",
+    "mcp__expo__open_devtools",
+    "mcp__expo__automation_tap",
+    "mcp__expo__automation_take_screenshot",
+    "mcp__expo__automation_find_view_by_testid",
+    "mcp__expo__automation_tap_by_testid",
+    "mcp__expo__automation_take_screenshot_by_testid",
+]
+
 # Playwright MCP tools for browser automation
 PLAYWRIGHT_TOOLS = [
     # Core navigation & screenshots
@@ -112,6 +131,8 @@ def create_client(project_dir: Path, model: str):
                 *PLAYWRIGHT_TOOLS,
                 # Allow Feature MCP tools for feature management
                 *FEATURE_MCP_TOOLS,
+                # Allow Expo MCP tools for React Native/Expo development
+                *EXPO_MCP_TOOLS,
             ],
         },
     }
@@ -128,7 +149,7 @@ def create_client(project_dir: Path, model: str):
     print("   - Sandbox enabled (OS-level bash isolation)")
     print(f"   - Filesystem restricted to: {project_dir.resolve()}")
     print("   - Bash commands restricted to allowlist (see security.py)")
-    print("   - MCP servers: playwright (browser), features (database)")
+    print("   - MCP servers: playwright (browser), features (database), expo (React Native)")
     print("   - Project settings enabled (skills, commands, CLAUDE.md)")
     print()
 
@@ -142,16 +163,25 @@ def create_client(project_dir: Path, model: str):
                 *BUILTIN_TOOLS,
                 *PLAYWRIGHT_TOOLS,
                 *FEATURE_MCP_TOOLS,
+                *EXPO_MCP_TOOLS,
             ],
             mcp_servers={
                 "playwright": {"command": "npx", "args": ["@playwright/mcp@latest", "--viewport-size", "1280x720"]},
                 # "playwright": {"command": "npx", "args": ["@playwright/mcp@latest", "--headless"]},
-		"features": {
+                "features": {
                     "command": sys.executable,  # Use the same Python that's running this script
                     "args": ["-m", "mcp_server.feature_mcp"],
                     "env": {
                         "PROJECT_DIR": str(project_dir.resolve()),
                         "PYTHONPATH": str(Path(__file__).parent.resolve()),
+                    },
+                },
+                "expo": {
+                    "command": "npx",
+                    "args": ["@anthropic-ai/claude-mcp-server-expo"],
+                    "env": {
+                        # Enable local capabilities for automation (screenshots, taps, etc.)
+                        "EXPO_UNSTABLE_MCP_SERVER": "1",
                     },
                 },
             },

@@ -34,6 +34,9 @@ ALLOWED_COMMANDS = {
     "npx",
     "pnpm",  # Project uses pnpm
     "node",
+    # Expo/React Native development
+    "expo",  # Expo CLI
+    "eas",   # Expo Application Services CLI
     # Version control
     "git",
     # Docker (for PostgreSQL)
@@ -191,6 +194,8 @@ def validate_pkill_command(command_string: str) -> tuple[bool, str]:
         "npx",
         "vite",
         "next",
+        "expo",  # Expo dev server
+        "eas",   # EAS CLI
     }
 
     try:

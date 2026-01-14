@@ -123,6 +123,7 @@ Multi-layered defense-in-depth approach (configured in `client.py`):
 Defined in `security.py::ALLOWED_COMMANDS`:
 - File inspection: `ls`, `cat`, `head`, `tail`, `wc`, `grep`
 - Node.js: `npm`, `npx`, `pnpm`, `node`
+- Expo/React Native: `expo`, `eas`
 - Git: `git`
 - Docker: `docker` (for databases)
 - Process management: `ps`, `lsof`, `sleep`, `kill`, `pkill` (dev processes only)
@@ -134,7 +135,7 @@ Defined in `security.py::ALLOWED_COMMANDS`:
 
 ## MCP Server Integration
 
-The agent uses two MCP servers (configured in `client.py`):
+The agent uses three MCP servers (configured in `client.py`):
 
 ### 1. Playwright MCP (Browser Automation)
 
@@ -162,6 +163,32 @@ python -m mcp_server.feature_mcp
 - `feature_approve(feature_id)`: Approve a skipped feature to be worked on again
 - `feature_reject_skip(feature_id)`: Permanently reject a skipped feature
 - `feature_record_failure(feature_id, error_message)`: Record a failure for stuck loop detection
+
+### 3. Expo MCP (React Native/Expo Development)
+
+```bash
+npx @anthropic-ai/claude-mcp-server-expo
+```
+
+**Remote Capabilities (always available):**
+
+- `learn`: Retrieve Expo how-to guides on specific topics
+- `search_documentation`: Query Expo docs using natural language
+- `add_library`: Install Expo packages via `npx expo install`
+- `generate_claude_md`: Create CLAUDE.md configuration files
+- `generate_agents_md`: Create AGENTS.md files
+
+**Local Capabilities (requires local dev server with `expo-mcp` package):**
+
+- `expo_router_sitemap`: Display expo-router sitemap output
+- `open_devtools`: Launch React Native DevTools
+- `automation_tap`: Tap screen coordinates
+- `automation_take_screenshot`: Capture full device screenshots
+- `automation_find_view_by_testid`: Locate views by testID
+- `automation_tap_by_testid`: Tap views by testID
+- `automation_take_screenshot_by_testid`: Screenshot specific views by testID
+
+**Note:** For local capabilities, the project must have `expo-mcp` installed and `EXPO_UNSTABLE_MCP_SERVER=1` environment variable set when running the dev server.
 
 ## Prompt Template System
 

@@ -36,34 +36,34 @@ if [ -f ".env.local" ]; then
 fi
 
 # Check authentication - prefer OAuth token, allow API key with warning
-if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-    echo "[OK] Claude authenticated (OAuth token)"
-elif [ -n "$ANTHROPIC_API_KEY" ]; then
-    echo "[!] Using ANTHROPIC_API_KEY"
-    echo ""
-    echo "WARNING: Using the Anthropic API key directly will cost significantly"
-    echo "more than using Claude Code with OAuth authentication."
-    echo ""
-    echo "For cost-effective usage, run 'claude setup-token' to create"
-    echo "a CLAUDE_CODE_OAUTH_TOKEN environment variable."
-    echo ""
-    read -p "Continue with ANTHROPIC_API_KEY? (y/n): " API_KEY_CHOICE
+#if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+#    echo "[OK] Claude authenticated (OAuth token)"
+#elif [ -n "$ANTHROPIC_API_KEY" ]; then
+#    echo "[!] Using ANTHROPIC_API_KEY"
+#    echo ""
+#    echo "WARNING: Using the Anthropic API key directly will cost significantly"
+#    echo "more than using Claude Code with OAuth authentication."
+#    echo ""
+#    echo "For cost-effective usage, run 'claude setup-token' to create"
+#    echo "a CLAUDE_CODE_OAUTH_TOKEN environment variable."
+#    echo ""
+#    read -p "Continue with ANTHROPIC_API_KEY? (y/n): " API_KEY_CHOICE
 
-    if [[ "$API_KEY_CHOICE" =~ ^[Yy]$ ]]; then
-        echo ""
-        echo "[OK] Proceeding with ANTHROPIC_API_KEY"
-    else
-        echo ""
-        echo "To use OAuth instead, unset ANTHROPIC_API_KEY and run 'claude setup-token'."
-        exit 1
-    fi
-else
-    echo "[!] Not authenticated with Claude"
-    echo ""
-    echo "Please run 'claude setup-token' to create a CLAUDE_CODE_OAUTH_TOKEN"
-    echo "environment variable, then run this script again."
-    exit 1
-fi
+#    if [[ "$API_KEY_CHOICE" =~ ^[Yy]$ ]]; then
+#        echo ""
+#        echo "[OK] Proceeding with ANTHROPIC_API_KEY"
+#    else
+#        echo ""
+#        echo "To use OAuth instead, unset ANTHROPIC_API_KEY and run 'claude setup-token'."
+#        exit 1
+#    fi
+#else
+#    echo "[!] Not authenticated with Claude"
+#    echo ""
+#    echo "Please run 'claude setup-token' to create a CLAUDE_CODE_OAUTH_TOKEN"
+#    echo "environment variable, then run this script again."
+#    exit 1
+#fi
 
 echo ""
 
